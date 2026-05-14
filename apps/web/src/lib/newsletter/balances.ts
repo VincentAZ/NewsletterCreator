@@ -1,3 +1,4 @@
+import { loadLocalEnv } from "./env";
 import type { Balances, ProviderBalance } from "./types";
 
 const nowIso = () => new Date().toISOString();
@@ -7,6 +8,7 @@ function missing(provider: ProviderBalance["provider"], label: string, details: 
 }
 
 export async function getBalances(): Promise<Balances> {
+  loadLocalEnv();
   const [openRouter, fal] = await Promise.all([getOpenRouterBalance(), getFalBalance()]);
   return { openRouter, fal };
 }
@@ -58,6 +60,17 @@ async function getFalBalance(): Promise<ProviderBalance> {
       cache: "no-store",
     });
     if (!response.ok) {
+      if (response.status === 403) {
+        return {
+          provider: "fal",
+          status: "unavailable",
+          label: "fal.ai",
+          balance: null,
+          currency: "USD",
+          updatedAt: nowIso(),
+          details: "Billing balance is unavailable for this key. fal image generation may still work.",
+        };
+      }
       return providerError("fal", "fal.ai", `Billing request failed with ${response.status}. Admin key may be required.`);
     }
     const payload = (await response.json()) as {

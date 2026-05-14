@@ -34,6 +34,16 @@ export type Article = {
   score: number;
 };
 
+export type NewsSource = {
+  id: string;
+  name: string;
+  type: "rss" | "hn_algolia";
+  url: string;
+  enabled: boolean;
+  limit: number;
+  query?: string;
+};
+
 export type NewsletterStory = {
   title: string;
   url: string;
@@ -47,7 +57,6 @@ export type NewsletterSection = {
   heading: string;
   summary: string;
   items: NewsletterStory[];
-  approved?: boolean;
   feedback?: string;
 };
 

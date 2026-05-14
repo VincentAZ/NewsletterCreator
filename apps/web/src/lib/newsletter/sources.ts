@@ -1,39 +1,71 @@
-import type { Article } from "./types";
+import type { Article, NewsSource } from "./types";
 
-const RSS_SOURCES = [
-  ["Hacker News", "https://news.ycombinator.com/rss"],
-  ["OpenAI Blog", "https://openai.com/news/rss.xml"],
-  ["Simon Willison", "https://simonwillison.net/atom/everything/"],
-  ["The Verge AI", "https://www.theverge.com/ai-artificial-intelligence/rss/index.xml"],
-  ["Hugging Face", "https://huggingface.co/blog/feed.xml"],
-  ["VentureBeat AI", "https://venturebeat.com/category/ai/feed/"],
-  ["Latent Space", "https://www.latent.space/feed"],
-] as const;
-
-export async function gatherArticles(): Promise<{ articles: Article[]; sourceCount: number }> {
-  const rssResults = await Promise.allSettled(RSS_SOURCES.map(([name, url]) => fetchRssSource(name, url)));
-  const rssArticles = rssResults.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
-  const hnArticles = await fetchHackerNewsAlgolia();
-  return { articles: dedupeArticles([...rssArticles, ...hnArticles]).sort((a, b) => b.score - a.score).slice(0, 60), sourceCount: RSS_SOURCES.length + 1 };
-}
-
-async function fetchRssSource(source: string, url: string): Promise<Article[]> {
-  const response = await fetch(url, { headers: { "user-agent": "GodModeNewsletter/1.0" }, cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`${source} failed with ${response.status}`);
-  }
-  return parseFeed(await response.text(), source).slice(0, 20);
-}
-
-async function fetchHackerNewsAlgolia(): Promise<Article[]> {
-  const params = new URLSearchParams({
+export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
+  { id: "rss-hacker-news", name: "Hacker News", type: "rss", url: "https://news.ycombinator.com/rss", enabled: true, limit: 20 },
+  { id: "rss-openai-blog", name: "OpenAI Blog", type: "rss", url: "https://openai.com/news/rss.xml", enabled: true, limit: 20 },
+  { id: "rss-simon-willison", name: "Simon Willison", type: "rss", url: "https://simonwillison.net/atom/everything/", enabled: true, limit: 20 },
+  { id: "rss-verge-ai", name: "The Verge AI", type: "rss", url: "https://www.theverge.com/ai-artificial-intelligence/rss/index.xml", enabled: true, limit: 20 },
+  { id: "rss-hugging-face", name: "Hugging Face", type: "rss", url: "https://huggingface.co/blog/feed.xml", enabled: true, limit: 20 },
+  { id: "rss-venturebeat-ai", name: "VentureBeat AI", type: "rss", url: "https://venturebeat.com/category/ai/feed/", enabled: true, limit: 20 },
+  { id: "rss-latent-space", name: "Latent Space", type: "rss", url: "https://www.latent.space/feed", enabled: true, limit: 20 },
+  {
+    id: "hn-algolia-ai",
+    name: "HN Algolia AI",
+    type: "hn_algolia",
+    url: "https://hn.algolia.com/api/v1/search_by_date",
+    enabled: true,
+    limit: 20,
     query: "AI OR artificial intelligence OR LLM OR OpenAI OR Anthropic OR model",
+  },
+];
+
+export async function gatherArticles(sources: NewsSource[] = DEFAULT_NEWS_SOURCES): Promise<{ articles: Article[]; sourceCount: number }> {
+  const enabledSources = normalizeSources(sources).filter((source) => source.enabled);
+  const results = await Promise.allSettled(enabledSources.map(fetchSource));
+  const articles = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
+  return {
+    articles: dedupeArticles(articles).sort((a, b) => b.score - a.score).slice(0, 60),
+    sourceCount: enabledSources.length,
+  };
+}
+
+export function normalizeSources(sources: NewsSource[]) {
+  return sources
+    .map((source) => ({
+      ...source,
+      id: source.id || stableId(`${source.name}-${source.url}`),
+      name: source.name.trim(),
+      url: source.url.trim(),
+      limit: Math.max(1, Math.min(Number(source.limit) || 20, 100)),
+      query: source.query?.trim(),
+    }))
+    .filter((source) => source.name && source.url);
+}
+
+async function fetchSource(source: NewsSource): Promise<Article[]> {
+  if (source.type === "hn_algolia") {
+    return fetchHackerNewsAlgolia(source);
+  }
+  return fetchRssSource(source);
+}
+
+async function fetchRssSource(source: NewsSource): Promise<Article[]> {
+  const response = await fetch(source.url, { headers: { "user-agent": "GodModeNewsletter/1.0" }, cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`${source.name} failed with ${response.status}`);
+  }
+  return parseFeed(await response.text(), source.name).slice(0, source.limit);
+}
+
+async function fetchHackerNewsAlgolia(source: NewsSource): Promise<Article[]> {
+  const params = new URLSearchParams({
+    query: source.query || "AI OR artificial intelligence OR LLM OR OpenAI OR Anthropic OR model",
     tags: "story",
     numericFilters: `created_at_i>${Math.floor(Date.now() / 1000) - 86400 * 3}`,
-    hitsPerPage: "20",
+    hitsPerPage: String(source.limit),
   });
   try {
-    const response = await fetch(`https://hn.algolia.com/api/v1/search_by_date?${params}`, { cache: "no-store" });
+    const response = await fetch(`${source.url}?${params}`, { cache: "no-store" });
     if (!response.ok) return [];
     const payload = (await response.json()) as { hits?: Array<{ title?: string; story_title?: string; url?: string; story_url?: string; created_at?: string; points?: number }> };
     return (payload.hits ?? [])
@@ -41,7 +73,7 @@ async function fetchHackerNewsAlgolia(): Promise<Article[]> {
         const title = hit.title ?? hit.story_title;
         const url = hit.url ?? hit.story_url;
         return title && url
-          ? { id: stableId(url), title: decodeHtml(title), url, source: "HN Algolia", summary: "Recent Hacker News story matched by the AI-news search query.", published: hit.created_at ?? null, score: 65 + Math.min(hit.points ?? 0, 200) / 10 }
+          ? { id: stableId(url), title: decodeHtml(title), url, source: source.name, summary: "Recent Hacker News story matched by the AI-news search query.", published: hit.created_at ?? null, score: 65 + Math.min(hit.points ?? 0, 200) / 10 }
           : null;
       })
       .filter((article): article is Article => article !== null);

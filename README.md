@@ -15,8 +15,6 @@ Open `http://localhost:3000`.
 
 ```powershell
 $env:OPENROUTER_API_KEY = "sk-or-..."
-$env:OPENROUTER_SITE_URL = "http://localhost:3000"
-$env:OPENROUTER_APP_TITLE = "GodMode Daily Newsletter"
 $env:FAL_KEY = "..."
 ```
 

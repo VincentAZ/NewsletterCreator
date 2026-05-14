@@ -1,7 +1,9 @@
 import { buildNewsletterPrompt, createFallbackDraft, parseDraftFromModel, validateNewsletterDraft } from "./draft";
+import { loadLocalEnv } from "./env";
 import type { Article, GeneratedImage, NewsletterDraft, ProviderModel } from "./types";
 
 export async function getOpenRouterModels(): Promise<ProviderModel[]> {
+  loadLocalEnv();
   const apiKey = process.env.OPENROUTER_API_KEY;
   const response = await fetch("https://openrouter.ai/api/v1/models?output_modalities=text", {
     headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
@@ -26,6 +28,7 @@ export async function getOpenRouterModels(): Promise<ProviderModel[]> {
 }
 
 export async function getFalImageModels(): Promise<ProviderModel[]> {
+  loadLocalEnv();
   const apiKey = process.env.FAL_KEY;
   const response = await fetch("https://api.fal.ai/v1/models?category=text-to-image&status=active&limit=100", {
     headers: apiKey ? { Authorization: `Key ${apiKey}` } : {},
@@ -52,6 +55,7 @@ export async function generateNewsletterDraft(input: {
   previousDraft?: NewsletterDraft;
   target?: string;
 }): Promise<{ draft: NewsletterDraft; usedFallback: boolean; raw?: string }> {
+  loadLocalEnv();
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return { draft: createFallbackDraft(input.articles, input.feedback), usedFallback: true };
@@ -62,8 +66,6 @@ export async function generateNewsletterDraft(input: {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": process.env.OPENROUTER_SITE_URL ?? "http://localhost:3000",
-      "X-Title": process.env.OPENROUTER_APP_TITLE ?? "GodMode Daily Newsletter",
     },
     body: JSON.stringify({
       model: input.model,
@@ -92,6 +94,7 @@ export async function generateNewsletterDraft(input: {
 }
 
 export async function generateFalImage(input: { model: string; prompt: string; feedback?: string }): Promise<GeneratedImage> {
+  loadLocalEnv();
   const apiKey = process.env.FAL_KEY;
   if (!apiKey) {
     return {

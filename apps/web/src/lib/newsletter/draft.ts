@@ -71,7 +71,6 @@ export function normalizeDraft(draft: NewsletterDraft): NewsletterDraft {
         summary: item.summary ?? "",
         whyItMatters: item.whyItMatters ?? "",
       })),
-      approved: section.approved ?? false,
       feedback: section.feedback ?? "",
     })),
     imagePrompt: draft.imagePrompt ?? "",
@@ -90,7 +89,7 @@ export function createFallbackDraft(articles: Article[], feedback?: string): New
   return {
     subject: "Daily AI Brief: models, tools, and market signals",
     preheader: "A curated AI-news draft ready for editorial review.",
-    intro: "Today's draft is assembled from the selected source queue. Review each section before approval.",
+    intro: "Today's draft is assembled from the selected source queue. Review each section before publishing.",
     sections: groups
       .filter(([, , items]) => items.length > 0)
       .map(([id, heading, items]) => ({
@@ -104,7 +103,6 @@ export function createFallbackDraft(articles: Article[], feedback?: string): New
           summary: article.summary || "Source did not provide a summary.",
           whyItMatters: "This may affect AI product direction, developer workflows, or platform strategy.",
         })),
-        approved: false,
         feedback: "",
       })),
     imagePrompt:
