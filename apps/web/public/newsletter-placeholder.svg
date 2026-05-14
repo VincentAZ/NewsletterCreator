@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Newsletter hero placeholder</title>
+  <desc id="desc">Abstract editorial image placeholder used when fal.ai is not configured.</desc>
+  <rect width="1280" height="720" fill="#101820"/>
+  <path d="M0 520C210 430 330 610 530 500C760 374 860 160 1280 236V720H0Z" fill="#1f6f78"/>
+  <path d="M0 590C300 470 440 660 700 560C930 472 1010 352 1280 390V720H0Z" fill="#d08c60"/>
+  <circle cx="904" cy="210" r="104" fill="#f2cc8f"/>
+  <path d="M247 228h470v58H247zm0 96h610v34H247zm0 66h520v34H247zm0 66h430v34H247z" fill="#f4f1de"/>
+</svg>
