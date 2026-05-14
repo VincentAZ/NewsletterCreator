@@ -1,11 +1,14 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import type {
   Article,
   Balances,
   GeneratedImage,
+  MailchimpCampaignDraft,
+  MailchimpSectionMap,
   NewsSource,
+  NewsletterPreferences,
   NewsletterDraft,
   NewsletterSection,
   ProviderBalance,
@@ -43,6 +46,20 @@ type ImagePayload = {
   balances: Balances;
 };
 
+type PreferencesPayload = {
+  configured: boolean;
+  preferences: NewsletterPreferences | null;
+  error?: string;
+};
+
+type MailchimpPayload = {
+  campaign?: MailchimpCampaignDraft;
+  error?: string;
+};
+
+const preferenceIdKey = "newsletterCreator.preferenceId.v1";
+const localPreferencesKey = "newsletterCreator.preferences.v1";
+
 const emptyBalances: Balances = {
   openRouter: {
     provider: "openrouter",
@@ -70,15 +87,7 @@ const defaultNewsSources: NewsSource[] = [
   { id: "rss-hugging-face", name: "Hugging Face", type: "rss", url: "https://huggingface.co/blog/feed.xml", enabled: true, limit: 20 },
   { id: "rss-venturebeat-ai", name: "VentureBeat AI", type: "rss", url: "https://venturebeat.com/category/ai/feed/", enabled: true, limit: 20 },
   { id: "rss-latent-space", name: "Latent Space", type: "rss", url: "https://www.latent.space/feed", enabled: true, limit: 20 },
-  {
-    id: "hn-algolia-ai",
-    name: "HN Algolia AI",
-    type: "hn_algolia",
-    url: "https://hn.algolia.com/api/v1/search_by_date",
-    enabled: true,
-    limit: 20,
-    query: "AI OR artificial intelligence OR LLM OR OpenAI OR Anthropic OR model",
-  },
+  { id: "site-anthropic-news", name: "Anthropic News", type: "website", url: "https://www.anthropic.com/news", enabled: true, limit: 20 },
 ];
 
 const emptySourceDraft: NewsSource = {
@@ -91,6 +100,13 @@ const emptySourceDraft: NewsSource = {
   query: "",
 };
 
+const defaultMailchimpSectionMap: MailchimpSectionMap = {
+  preheader: "preheader",
+  intro: "intro",
+  heroImage: "hero_image",
+  body: "body",
+};
+
 export function NewsletterDashboard() {
   const [openRouterModels, setOpenRouterModels] = useState<ProviderModel[]>([]);
   const [falModels, setFalModels] = useState<ProviderModel[]>([]);
@@ -99,6 +115,8 @@ export function NewsletterDashboard() {
   const [showAddSource, setShowAddSource] = useState(false);
   const [copyModel, setCopyModel] = useState("");
   const [imageModel, setImageModel] = useState("");
+  const [copyModelSearch, setCopyModelSearch] = useState("");
+  const [imageModelSearch, setImageModelSearch] = useState("");
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedArticleIds, setSelectedArticleIds] = useState<Set<string>>(new Set());
   const [articleSourceFilter, setArticleSourceFilter] = useState<string>("all");
@@ -108,8 +126,14 @@ export function NewsletterDashboard() {
   const [balances, setBalances] = useState<Balances>(emptyBalances);
   const [globalFeedback, setGlobalFeedback] = useState("");
   const [imageFeedback, setImageFeedback] = useState("");
+  const [mailchimpTemplateId, setMailchimpTemplateId] = useState("");
+  const [mailchimpSectionMap, setMailchimpSectionMap] = useState<MailchimpSectionMap>(defaultMailchimpSectionMap);
+  const [mailchimpCampaign, setMailchimpCampaign] = useState<MailchimpCampaignDraft | null>(null);
   const [status, setStatus] = useState("Load models and sources to start.");
   const [isBusy, setIsBusy] = useState(false);
+  const [preferenceId, setPreferenceId] = useState("");
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const lastSavedPreferences = useRef("");
 
   const selectedArticles = useMemo(() => {
     return articles.filter((article) => selectedArticleIds.has(article.id));
@@ -127,29 +151,78 @@ export function NewsletterDashboard() {
     }
     return articles.filter((article) => article.source === articleSourceFilter);
   }, [articles, articleSourceFilter]);
+  const filteredOpenRouterModels = useMemo(() => {
+    return filterModels(openRouterModels, copyModelSearch);
+  }, [copyModelSearch, openRouterModels]);
+  const filteredFalModels = useMemo(() => {
+    return filterModels(falModels, imageModelSearch);
+  }, [falModels, imageModelSearch]);
+  const selectedCopyModel = useMemo(() => {
+    return openRouterModels.find((model) => model.id === copyModel) ?? null;
+  }, [copyModel, openRouterModels]);
+  const selectedImageModel = useMemo(() => {
+    return falModels.find((model) => model.id === imageModel) ?? null;
+  }, [falModels, imageModel]);
 
   const canGenerateDraft = copyModel && selectedArticles.length > 0 && !isBusy;
   const canGenerateImage = draft?.imagePrompt.trim() && imageModel && !isBusy;
+  const canPopulateMailchimp = Boolean(draft && image && !isBusy);
   const currentStep = getCurrentStep({
     modelsLoaded: openRouterModels.length > 0 && falModels.length > 0,
     articlesLoaded: articles.length > 0,
     draftReady: Boolean(draft),
     imageReady: Boolean(image),
+    mailchimpReady: Boolean(mailchimpCampaign),
   });
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadBalances() {
+    async function loadInitialState() {
+      const id = getOrCreatePreferenceId();
+      setPreferenceId(id);
+
+      const preferencesPayload = await fetchJson<PreferencesPayload>(
+        `/api/newsletter/preferences?preferenceId=${encodeURIComponent(id)}`,
+      );
+      const preferences = preferencesPayload.configured ? preferencesPayload.preferences : loadLocalPreferences();
+
+      if (preferences?.sources.length) {
+        setSources(normalizeDashboardSources(preferences.sources));
+      }
+      if (preferences?.copyModel) {
+        setCopyModel(preferences.copyModel);
+      }
+      if (preferences?.imageModel) {
+        setImageModel(preferences.imageModel);
+      }
+      lastSavedPreferences.current = serializePreferences({
+        sources: preferences?.sources.length ? preferences.sources : defaultNewsSources,
+        copyModel: preferences?.copyModel ?? "",
+        imageModel: preferences?.imageModel ?? "",
+      });
+
       const payload = await fetchJson<{ balances: Balances }>("/api/newsletter/balances");
       if (isMounted) {
         setBalances(payload.balances);
+        setPreferencesLoaded(true);
       }
     }
 
-    void loadBalances().catch(() => {
+    void loadInitialState().catch(() => {
       if (isMounted) {
-        setStatus("Balance check failed. Load models to retry provider checks.");
+        const preferences = loadLocalPreferences();
+        if (preferences?.sources.length) {
+          setSources(normalizeDashboardSources(preferences.sources));
+        }
+        if (preferences?.copyModel) {
+          setCopyModel(preferences.copyModel);
+        }
+        if (preferences?.imageModel) {
+          setImageModel(preferences.imageModel);
+        }
+        setPreferencesLoaded(true);
+        setStatus("Preferences or balance check failed. Load models to retry provider checks.");
       }
     });
 
@@ -157,6 +230,49 @@ export function NewsletterDashboard() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!preferencesLoaded || !preferenceId) {
+      return;
+    }
+
+    const preferences = { sources, copyModel, imageModel };
+    const serialized = serializePreferences(preferences);
+    if (serialized === lastSavedPreferences.current) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      localStorage.setItem(localPreferencesKey, serialized);
+      lastSavedPreferences.current = serialized;
+      void putJson<PreferencesPayload>("/api/newsletter/preferences", {
+        preferenceId,
+        ...preferences,
+      }).catch(() => {
+        // Local preferences have already been saved; the API can retry on the next change.
+      });
+    }, 600);
+
+    return () => window.clearTimeout(timeout);
+  }, [copyModel, imageModel, preferenceId, preferencesLoaded, sources]);
+
+  useEffect(() => {
+    if (!copyModelSearch.trim() || filteredOpenRouterModels.length === 0) {
+      return;
+    }
+    if (!filteredOpenRouterModels.some((model) => model.id === copyModel)) {
+      setCopyModel(filteredOpenRouterModels[0].id);
+    }
+  }, [copyModel, copyModelSearch, filteredOpenRouterModels]);
+
+  useEffect(() => {
+    if (!imageModelSearch.trim() || filteredFalModels.length === 0) {
+      return;
+    }
+    if (!filteredFalModels.some((model) => model.id === imageModel)) {
+      setImageModel(filteredFalModels[0].id);
+    }
+  }, [filteredFalModels, imageModel, imageModelSearch]);
 
   async function loadModels() {
     setIsBusy(true);
@@ -237,6 +353,32 @@ export function NewsletterDashboard() {
     }
 
     setBalances(payload.balances);
+    setIsBusy(false);
+  }
+
+  async function populateMailchimpTemplate() {
+    if (!draft || !image || !canPopulateMailchimp) {
+      return;
+    }
+
+    setIsBusy(true);
+    setStatus("Creating a Mailchimp draft campaign and populating the template.");
+
+    const templateId = Number(mailchimpTemplateId);
+    const payload = await postJson<MailchimpPayload>("/api/newsletter/mailchimp", {
+      draft,
+      image,
+      templateId: Number.isFinite(templateId) && templateId > 0 ? templateId : undefined,
+      sectionMap: mailchimpSectionMap,
+    });
+
+    if (payload.campaign) {
+      setMailchimpCampaign(payload.campaign);
+      setStatus(`Mailchimp draft created: ${payload.campaign.title}. Review it in Mailchimp before sending.`);
+    } else {
+      setStatus(payload.error ?? "Mailchimp template population failed.");
+    }
+
     setIsBusy(false);
   }
 
@@ -351,6 +493,10 @@ export function NewsletterDashboard() {
     return section?.feedback ?? "";
   }
 
+  function updateMailchimpSection(field: keyof MailchimpSectionMap, value: string) {
+    setMailchimpSectionMap((current) => ({ ...current, [field]: value.trim() }));
+  }
+
   return (
     <div className="newsletterApp">
       <header className="appHeader">
@@ -365,29 +511,58 @@ export function NewsletterDashboard() {
       </header>
 
       <section className="toolbar">
-        <label>
-          Copy model
-          <select value={copyModel} onChange={(event) => setCopyModel(event.target.value)}>
-            {openRouterModels.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Image model
-          <select value={imageModel} onChange={(event) => setImageModel(event.target.value)}>
-            {falModels.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" onClick={loadModels} disabled={isBusy}>
-          Load models
-        </button>
+        <div className="modelControl">
+          <label>
+            Search copy models
+            <input
+              value={copyModelSearch}
+              onChange={(event) => setCopyModelSearch(event.target.value)}
+              placeholder="Model name or id"
+            />
+          </label>
+          <label>
+            Copy model
+            <select value={copyModel} onChange={(event) => setCopyModel(event.target.value)}>
+              {filteredOpenRouterModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <ModelCapabilities model={selectedCopyModel} emptyLabel="Load models to inspect copy capabilities." />
+        </div>
+        <div className="modelControl">
+          <label>
+            Search image models
+            <input
+              value={imageModelSearch}
+              onChange={(event) => setImageModelSearch(event.target.value)}
+              placeholder="Model name, id, or category"
+            />
+          </label>
+          <label>
+            Image model
+            <select value={imageModel} onChange={(event) => setImageModel(event.target.value)}>
+              {filteredFalModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <ModelCapabilities model={selectedImageModel} emptyLabel="Load models to inspect image capabilities." />
+        </div>
+        <div className="toolbarActions">
+          <button type="button" onClick={loadModels} disabled={isBusy}>
+            Load models
+          </button>
+          <span>
+            {openRouterModels.length + falModels.length > 0
+              ? `${filteredOpenRouterModels.length}/${openRouterModels.length} copy, ${filteredFalModels.length}/${falModels.length} image`
+              : "No model catalogs loaded"}
+          </span>
+        </div>
       </section>
 
       <p className="statusLine">{status}</p>
@@ -456,8 +631,8 @@ export function NewsletterDashboard() {
                         setSourceDraft((current) => ({ ...current, type: event.target.value as NewsSource["type"] }))
                       }
                     >
-                      <option value="rss">RSS</option>
-                      <option value="hn_algolia">HN Algolia</option>
+                      <option value="rss">RSS feed</option>
+                      <option value="website">Website scrape</option>
                     </select>
                   </label>
                   <label className="fieldBlock compact">
@@ -472,23 +647,13 @@ export function NewsletterDashboard() {
                   </label>
                 </div>
                 <label className="fieldBlock compact">
-                  Feed or API URL
+                  {sourceDraft.type === "rss" ? "Feed URL" : "Website URL"}
                   <input
                     value={sourceDraft.url}
                     onChange={(event) => setSourceDraft((current) => ({ ...current, url: event.target.value }))}
-                    placeholder="https://example.com/rss.xml"
+                    placeholder={sourceDraft.type === "rss" ? "https://example.com/rss.xml" : "https://example.com/news"}
                   />
                 </label>
-                {sourceDraft.type === "hn_algolia" ? (
-                  <label className="fieldBlock compact">
-                    Algolia query
-                    <input
-                      value={sourceDraft.query ?? ""}
-                      onChange={(event) => setSourceDraft((current) => ({ ...current, query: event.target.value }))}
-                      placeholder="AI OR LLM OR ..."
-                    />
-                  </label>
-                ) : null}
                 <div className="sourceActions">
                   <button type="button" onClick={addSource}>
                     Add source
@@ -528,7 +693,7 @@ export function NewsletterDashboard() {
                         </span>
                         <span className="sourceSummaryName">{source.name || "Untitled source"}</span>
                         <span className="sourceSummaryMeta">
-                          {source.type === "rss" ? "RSS" : "HN"} · {source.limit}
+                          {source.type === "rss" ? "RSS" : "Web"} · {source.limit}
                         </span>
                       </button>
                       <button
@@ -560,8 +725,8 @@ export function NewsletterDashboard() {
                               }
                               aria-label={`${source.name} type`}
                             >
-                              <option value="rss">RSS</option>
-                              <option value="hn_algolia">HN</option>
+                              <option value="rss">RSS feed</option>
+                              <option value="website">Website scrape</option>
                             </select>
                           </label>
                           <label className="fieldBlock compact">
@@ -577,7 +742,7 @@ export function NewsletterDashboard() {
                           </label>
                         </div>
                         <label className="fieldBlock compact">
-                          Feed or API URL
+                          {source.type === "rss" ? "Feed URL" : "Website URL"}
                           <input
                             className="sourceUrl"
                             value={source.url}
@@ -586,17 +751,6 @@ export function NewsletterDashboard() {
                             title={source.url}
                           />
                         </label>
-                        {source.type === "hn_algolia" ? (
-                          <label className="fieldBlock compact">
-                            Algolia query
-                            <input
-                              value={source.query ?? ""}
-                              onChange={(event) => updateSource(source.id, { query: event.target.value })}
-                              placeholder="Algolia query"
-                              aria-label={`${source.name} Algolia query`}
-                            />
-                          </label>
-                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -778,6 +932,70 @@ export function NewsletterDashboard() {
             {image ? <img src={image.url} alt="Generated newsletter hero" /> : <span>No hero image yet.</span>}
           </div>
 
+          <section className="mailchimpPanel">
+            <div className="sectionHeader">
+              <h3>Mailchimp Template</h3>
+            </div>
+            <label className="fieldBlock compact">
+              Template ID
+              <input
+                value={mailchimpTemplateId}
+                onChange={(event) => setMailchimpTemplateId(event.target.value)}
+                placeholder="Uses MAILCHIMP_TEMPLATE_ID if blank"
+                inputMode="numeric"
+              />
+            </label>
+            <div className="mailchimpSectionGrid">
+              <label className="fieldBlock compact">
+                Preheader
+                <input
+                  value={mailchimpSectionMap.preheader ?? ""}
+                  onChange={(event) => updateMailchimpSection("preheader", event.target.value)}
+                  placeholder="preheader"
+                />
+              </label>
+              <label className="fieldBlock compact">
+                Intro
+                <input
+                  value={mailchimpSectionMap.intro}
+                  onChange={(event) => updateMailchimpSection("intro", event.target.value)}
+                  placeholder="intro"
+                />
+              </label>
+              <label className="fieldBlock compact">
+                Hero image
+                <input
+                  value={mailchimpSectionMap.heroImage}
+                  onChange={(event) => updateMailchimpSection("heroImage", event.target.value)}
+                  placeholder="hero_image"
+                />
+              </label>
+              <label className="fieldBlock compact">
+                Body
+                <input
+                  value={mailchimpSectionMap.body}
+                  onChange={(event) => updateMailchimpSection("body", event.target.value)}
+                  placeholder="body"
+                />
+              </label>
+            </div>
+            <button type="button" onClick={populateMailchimpTemplate} disabled={!canPopulateMailchimp}>
+              Populate Mailchimp
+            </button>
+            {mailchimpCampaign ? (
+              <div className="mailchimpResult">
+                <strong>{mailchimpCampaign.title}</strong>
+                <span>Campaign ID: {mailchimpCampaign.id}</span>
+                {mailchimpCampaign.archiveUrl ? (
+                  <a href={mailchimpCampaign.archiveUrl} target="_blank" rel="noreferrer">
+                    Preview
+                  </a>
+                ) : null}
+              </div>
+            ) : (
+              <div className="hintBox compact">Generate copy and image before populating Mailchimp.</div>
+            )}
+          </section>
         </aside>
       </main>
     </div>
@@ -785,7 +1003,7 @@ export function NewsletterDashboard() {
 }
 
 function StepBar({ currentStep }: { currentStep: number }) {
-  const steps = ["Models", "News", "Copy", "Image"];
+  const steps = ["Models", "News", "Copy", "Image", "Mailchimp"];
 
   return (
     <ol className="stepBar">
@@ -804,7 +1022,11 @@ function getCurrentStep(input: {
   articlesLoaded: boolean;
   draftReady: boolean;
   imageReady: boolean;
+  mailchimpReady: boolean;
 }) {
+  if (input.mailchimpReady) {
+    return 4;
+  }
   if (input.imageReady) {
     return 3;
   }
@@ -827,6 +1049,47 @@ function BalancePill({ balance }: { balance: ProviderBalance }) {
       <span>{balance.label}</span>
       <strong>{amount}</strong>
       <small>{balance.status}</small>
+    </div>
+  );
+}
+
+function ModelCapabilities({ model, emptyLabel }: { model: ProviderModel | null; emptyLabel: string }) {
+  if (!model) {
+    return <div className="modelCapabilities empty">{emptyLabel}</div>;
+  }
+
+  return (
+    <div className="modelCapabilities">
+      <div className="modelCapabilityHeader">
+        <strong>{model.name}</strong>
+        <code>{model.id}</code>
+      </div>
+      <dl>
+        {model.category ? (
+          <>
+            <dt>Category</dt>
+            <dd>{model.category}</dd>
+          </>
+        ) : null}
+        {model.contextLength ? (
+          <>
+            <dt>Context</dt>
+            <dd>{model.contextLength.toLocaleString()} tokens</dd>
+          </>
+        ) : null}
+        {model.pricing ? (
+          <>
+            <dt>Pricing</dt>
+            <dd>{model.pricing}</dd>
+          </>
+        ) : null}
+        {model.description ? (
+          <>
+            <dt>Description</dt>
+            <dd>{model.description}</dd>
+          </>
+        ) : null}
+      </dl>
     </div>
   );
 }
@@ -888,6 +1151,25 @@ function formatRelativeDate(iso: string) {
   return new Date(time).toLocaleDateString();
 }
 
+function filterModels(models: ProviderModel[], query: string) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) {
+    return models;
+  }
+
+  return models.filter((model) => normalizeSearchText(modelSearchText(model)).includes(normalizedQuery));
+}
+
+function modelSearchText(model: ProviderModel) {
+  return [model.id, model.name, model.category]
+    .filter((value) => value !== undefined && value !== null)
+    .join(" ");
+}
+
+function normalizeSearchText(value: string) {
+  return value.trim().toLowerCase();
+}
+
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
   return (await response.json()) as T;
@@ -900,4 +1182,68 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   return (await response.json()) as T;
+}
+
+async function putJson<T>(url: string, body: unknown): Promise<T> {
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return (await response.json()) as T;
+}
+
+function getOrCreatePreferenceId() {
+  const existing = localStorage.getItem(preferenceIdKey);
+  if (existing) {
+    return existing;
+  }
+
+  const next = crypto.randomUUID();
+  localStorage.setItem(preferenceIdKey, next);
+  return next;
+}
+
+function loadLocalPreferences(): NewsletterPreferences | null {
+  try {
+    const raw = localStorage.getItem(localPreferencesKey);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<NewsletterPreferences>;
+    if (!Array.isArray(parsed.sources)) {
+      return null;
+    }
+
+    return {
+      preferenceId: typeof parsed.preferenceId === "string" ? parsed.preferenceId : "",
+      sources: parsed.sources,
+      copyModel: typeof parsed.copyModel === "string" ? parsed.copyModel : "",
+      imageModel: typeof parsed.imageModel === "string" ? parsed.imageModel : "",
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeDashboardSources(sources: NewsSource[]): NewsSource[] {
+  return sources.map((source) => {
+    const rawType = (source as NewsSource & { type?: string }).type;
+    const type: NewsSource["type"] = rawType === "rss" ? "rss" : "website";
+    return {
+      ...source,
+      type,
+      query: undefined,
+    };
+  });
+}
+
+function serializePreferences(input: { sources: NewsSource[]; copyModel: string; imageModel: string }) {
+  return JSON.stringify({
+    sources: normalizeDashboardSources(input.sources),
+    copyModel: input.copyModel,
+    imageModel: input.imageModel,
+  });
 }

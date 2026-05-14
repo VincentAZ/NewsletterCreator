@@ -165,22 +165,17 @@ textarea {
 }
 
 .toolbar {
-  align-items: end;
+  align-items: stretch;
   background: #e8edf0;
   border: 1px solid #d4dde3;
   border-radius: 8px;
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(11rem, auto);
   padding: 0.75rem;
 }
 
-.toolbar label:nth-of-type(2) {
-  grid-column: span 2;
-}
-
 .toolbar button {
-  justify-self: end;
   min-width: 9rem;
 }
 
@@ -193,6 +188,84 @@ textarea {
   gap: 0.35rem;
 }
 
+.modelControl {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.toolbarActions {
+  align-content: start;
+  display: grid;
+  gap: 0.55rem;
+  justify-items: stretch;
+}
+
+.toolbarActions span {
+  color: #5f6c76;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.modelCapabilities {
+  background: #f9fbfc;
+  border: 1px solid #d8e0e5;
+  border-radius: 6px;
+  color: #38444d;
+  display: grid;
+  gap: 0.45rem;
+  min-height: 7.4rem;
+  padding: 0.65rem;
+}
+
+.modelCapabilities.empty {
+  align-items: center;
+  color: #66727d;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.modelCapabilityHeader {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.modelCapabilityHeader strong {
+  font-size: 0.88rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.modelCapabilityHeader code {
+  color: #66727d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.modelCapabilities dl {
+  display: grid;
+  gap: 0.28rem 0.55rem;
+  grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr);
+  margin: 0;
+}
+
+.modelCapabilities dt {
+  color: #6c7882;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.modelCapabilities dd {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .statusLine {
   color: #44505a;
   margin: 0.8rem 0;
@@ -201,7 +274,7 @@ textarea {
 .stepBar {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   list-style: none;
   margin: 0 0 1rem;
   padding: 0;
@@ -734,6 +807,41 @@ textarea {
   width: 100%;
 }
 
+.mailchimpPanel {
+  border-top: 1px solid #e6eaee;
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 0.85rem;
+}
+
+.mailchimpSectionGrid {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.mailchimpResult {
+  background: #f6f8f9;
+  border: 1px solid #dce3e8;
+  border-radius: 6px;
+  color: #44505a;
+  display: grid;
+  font-size: 0.78rem;
+  gap: 0.25rem;
+  padding: 0.65rem;
+}
+
+.mailchimpResult strong,
+.mailchimpResult span,
+.mailchimpResult a {
+  overflow-wrap: anywhere;
+}
+
+.mailchimpResult a {
+  color: #234b5f;
+  font-weight: 800;
+}
+
 .emptyState {
   align-items: center;
   background: #f6f8f9;
@@ -762,15 +870,16 @@ textarea {
   text-align: center;
 }
 
+.hintBox.compact {
+  font-size: 0.78rem;
+  min-height: 4.5rem;
+}
+
 @media (max-width: 1180px) {
   .workspace,
   .toolbar,
   .stepBar {
     grid-template-columns: 1fr;
-  }
-
-  .toolbar label:nth-of-type(2) {
-    grid-column: auto;
   }
 
   .toolbar button {
@@ -790,5 +899,9 @@ textarea {
   .balancePill {
     flex: 1 1 9rem;
     min-width: 0;
+  }
+
+  .mailchimpSectionGrid {
+    grid-template-columns: 1fr;
   }
 }

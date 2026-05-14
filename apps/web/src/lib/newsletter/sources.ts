@@ -8,15 +8,7 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
   { id: "rss-hugging-face", name: "Hugging Face", type: "rss", url: "https://huggingface.co/blog/feed.xml", enabled: true, limit: 20 },
   { id: "rss-venturebeat-ai", name: "VentureBeat AI", type: "rss", url: "https://venturebeat.com/category/ai/feed/", enabled: true, limit: 20 },
   { id: "rss-latent-space", name: "Latent Space", type: "rss", url: "https://www.latent.space/feed", enabled: true, limit: 20 },
-  {
-    id: "hn-algolia-ai",
-    name: "HN Algolia AI",
-    type: "hn_algolia",
-    url: "https://hn.algolia.com/api/v1/search_by_date",
-    enabled: true,
-    limit: 20,
-    query: "AI OR artificial intelligence OR LLM OR OpenAI OR Anthropic OR model",
-  },
+  { id: "site-anthropic-news", name: "Anthropic News", type: "website", url: "https://www.anthropic.com/news", enabled: true, limit: 20 },
 ];
 
 export async function gatherArticles(sources: NewsSource[] = DEFAULT_NEWS_SOURCES): Promise<{ articles: Article[]; sourceCount: number }> {
@@ -29,22 +21,27 @@ export async function gatherArticles(sources: NewsSource[] = DEFAULT_NEWS_SOURCE
   };
 }
 
-export function normalizeSources(sources: NewsSource[]) {
+export function normalizeSources(sources: NewsSource[]): NewsSource[] {
   return sources
-    .map((source) => ({
-      ...source,
-      id: source.id || stableId(`${source.name}-${source.url}`),
-      name: source.name.trim(),
-      url: source.url.trim(),
-      limit: Math.max(1, Math.min(Number(source.limit) || 20, 100)),
-      query: source.query?.trim(),
-    }))
+    .map((source) => {
+      const rawType = (source as NewsSource & { type?: string }).type;
+      const type: NewsSource["type"] = rawType === "rss" ? "rss" : "website";
+      return {
+        ...source,
+        id: source.id || stableId(`${source.name}-${source.url}`),
+        name: source.name.trim(),
+        type,
+        url: source.url.trim(),
+        limit: Math.max(1, Math.min(Number(source.limit) || 20, 100)),
+        query: source.query?.trim(),
+      };
+    })
     .filter((source) => source.name && source.url);
 }
 
 async function fetchSource(source: NewsSource): Promise<Article[]> {
-  if (source.type === "hn_algolia") {
-    return fetchHackerNewsAlgolia(source);
+  if (source.type === "website") {
+    return scrapeWebsiteSource(source);
   }
   return fetchRssSource(source);
 }
@@ -57,29 +54,54 @@ async function fetchRssSource(source: NewsSource): Promise<Article[]> {
   return parseFeed(await response.text(), source.name).slice(0, source.limit);
 }
 
-async function fetchHackerNewsAlgolia(source: NewsSource): Promise<Article[]> {
-  const params = new URLSearchParams({
-    query: source.query || "AI OR artificial intelligence OR LLM OR OpenAI OR Anthropic OR model",
-    tags: "story",
-    numericFilters: `created_at_i>${Math.floor(Date.now() / 1000) - 86400 * 3}`,
-    hitsPerPage: String(source.limit),
-  });
-  try {
-    const response = await fetch(`${source.url}?${params}`, { cache: "no-store" });
-    if (!response.ok) return [];
-    const payload = (await response.json()) as { hits?: Array<{ title?: string; story_title?: string; url?: string; story_url?: string; created_at?: string; points?: number }> };
-    return (payload.hits ?? [])
-      .map((hit): Article | null => {
-        const title = hit.title ?? hit.story_title;
-        const url = hit.url ?? hit.story_url;
-        return title && url
-          ? { id: stableId(url), title: decodeHtml(title), url, source: source.name, summary: "Recent Hacker News story matched by the AI-news search query.", published: hit.created_at ?? null, score: 65 + Math.min(hit.points ?? 0, 200) / 10 }
-          : null;
-      })
-      .filter((article): article is Article => article !== null);
-  } catch {
-    return [];
+async function scrapeWebsiteSource(source: NewsSource): Promise<Article[]> {
+  const response = await fetch(source.url, { headers: { "user-agent": "GodModeNewsletter/1.0" }, cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`${source.name} failed with ${response.status}`);
   }
+  return parseWebsite(await response.text(), source).slice(0, source.limit);
+}
+
+function parseWebsite(html: string, source: NewsSource): Article[] {
+  const baseUrl = source.url;
+  const links = [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+    .map((match): Article | null => {
+      const url = resolveUrl(match[1] ?? "", baseUrl);
+      const title = decodeHtml(stripTags(match[2] ?? "")).replace(/\s+/g, " ").trim();
+      if (!url || !title || title.length < 12) {
+        return null;
+      }
+      return {
+        id: stableId(url),
+        title,
+        url,
+        source: source.name,
+        summary: `Story scraped from ${source.name}.`,
+        published: null,
+        score: scoreArticle(title, "", "", source.name),
+      };
+    })
+    .filter((article): article is Article => article !== null);
+
+  const unique = dedupeArticles(links);
+  if (unique.length > 0) {
+    return unique;
+  }
+
+  const title = decodeHtml(stripTags(extractTag(html, "title"))).replace(/\s+/g, " ").trim();
+  return title
+    ? [
+        {
+          id: stableId(source.url),
+          title,
+          url: source.url,
+          source: source.name,
+          summary: `Page scraped from ${source.name}.`,
+          published: null,
+          score: scoreArticle(title, "", "", source.name),
+        },
+      ]
+    : [];
 }
 
 function parseFeed(xml: string, source: string): Article[] {
@@ -148,6 +170,19 @@ function normalizeUrl(url: string) {
     return parsed.toString().replace(/\/$/, "");
   } catch {
     return url.toLowerCase().trim();
+  }
+}
+
+function resolveUrl(url: string, baseUrl: string) {
+  try {
+    const parsed = new URL(url, baseUrl);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return "";
+    }
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return "";
   }
 }
 

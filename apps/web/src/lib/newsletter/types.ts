@@ -37,7 +37,7 @@ export type Article = {
 export type NewsSource = {
   id: string;
   name: string;
-  type: "rss" | "hn_algolia";
+  type: "rss" | "website";
   url: string;
   enabled: boolean;
   limit: number;
@@ -76,6 +76,29 @@ export type GeneratedImage = {
   model: string;
   prompt: string;
   generatedAt: string;
+};
+
+export type MailchimpSectionMap = {
+  preheader?: string;
+  intro: string;
+  heroImage: string;
+  body: string;
+};
+
+export type MailchimpCampaignDraft = {
+  id: string;
+  webId?: number;
+  title: string;
+  status?: string;
+  archiveUrl?: string;
+};
+
+export type NewsletterPreferences = {
+  preferenceId: string;
+  sources: NewsSource[];
+  copyModel: string;
+  imageModel: string;
+  updatedAt: string;
 };
 
 export type ValidationResult = {
