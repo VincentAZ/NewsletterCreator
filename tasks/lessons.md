@@ -8,3 +8,5 @@
 - When adding compact controls inside broader button containers, check CSS specificity against parent rules such as `.toolbar button`; use selectors specific enough to preserve intended dimensions.
 - When helping with Mailchimp setup, state the required `.env` values up front before discussing template IDs or `mc:edit` section names: `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID`, `MAILCHIMP_TEMPLATE_ID`, `MAILCHIMP_FROM_NAME`, and `MAILCHIMP_REPLY_TO`.
 - For this app, treat Mailchimp as a single-user, single-template integration. Do not add dashboard/database complexity for switching templates or section maps unless the user explicitly asks for multi-template support.
+- For website source gathering, do not treat any nonzero scrape result as complete. If direct scraping returns fewer than the source limit, supplement from the fallback feed before applying the limit.
+- When reproducing a source-gathering bug, use the exact persisted source URL from preferences. Similar domains can have very different fallback coverage, as with `the-decoder.de` versus `the-decoder.com`.

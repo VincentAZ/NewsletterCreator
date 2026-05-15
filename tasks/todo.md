@@ -1,3 +1,64 @@
+---
+
+# Website Source Partial Result Fix
+
+## Plan
+
+- [x] Reproduce or isolate why a website source can stop below its configured limit.
+- [x] Adjust website scraping so sparse direct scrape results can be supplemented by fallback results.
+- [x] Verify The Decoder web source returns up to its configured limit.
+- [x] Run typecheck/build verification.
+- [x] Document results.
+
+## Verification
+
+- [x] The Decoder website source API probe
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Website scraping could return a short nonzero direct scrape result and stop before trying the fuller fallback.
+- Updated website sources to supplement direct scrape results with fallback feed results, dedupe, sort by score, and then apply the configured source limit.
+- The persisted The Decoder source used `the-decoder.de`, whose Google News `site:` fallback only returned 3 items.
+- Added equivalent-host fallback search for The Decoder so `the-decoder.de` also searches `the-decoder.com`.
+- The persisted The Decoder web source with limit 20 now returns 20 articles through the API.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
+# Website Source Gather Fix
+
+## Plan
+
+- [x] Review the website source fetch and parse logic.
+- [x] Reproduce the empty result with a website source through the local articles API or a focused helper probe.
+- [x] Fix the root cause with minimal changes to website scraping.
+- [x] Verify website sources return articles and RSS sources still work.
+- [x] Run typecheck/build verification.
+- [x] Document results.
+
+## Verification
+
+- [x] Website source API probe
+- [x] RSS source API probe
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- The Decoder website URL reproduced the empty result because direct fetches return HTTP 500 in this environment.
+- Website sources now try the direct page scrape first, then fall back to a Google News RSS `site:domain AI` query when the site cannot be fetched or has no scrapeable links.
+- Added browser-like accept/user-agent headers for website fetches.
+- Cleaned feed text extraction so escaped Google News HTML summaries are stripped before display.
+- Website API probe for The Decoder returned articles through the fallback.
+- RSS API probe for OpenAI Blog still returned articles.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
 # Mailchimp Draft Completeness Fix
 
 ## Plan

@@ -55,11 +55,52 @@ async function fetchRssSource(source: NewsSource): Promise<Article[]> {
 }
 
 async function scrapeWebsiteSource(source: NewsSource): Promise<Article[]> {
-  const response = await fetch(source.url, { headers: { "user-agent": "GodModeNewsletter/1.0" }, cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`${source.name} failed with ${response.status}`);
+  let directArticles: Article[] = [];
+
+  try {
+    const response = await fetch(source.url, {
+      headers: websiteHeaders("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error(`${source.name} failed with ${response.status}`);
+    }
+    directArticles = parseWebsite(await response.text(), source);
+    if (directArticles.length >= source.limit) {
+      return directArticles.slice(0, source.limit);
+    }
+  } catch {
+    directArticles = [];
   }
-  return parseWebsite(await response.text(), source).slice(0, source.limit);
+
+  const fallbackArticles = await fetchWebsiteNewsFallback(source);
+  const combinedArticles = dedupeArticles([...directArticles, ...fallbackArticles])
+    .sort((a, b) => b.score - a.score)
+    .slice(0, source.limit);
+
+  if (combinedArticles.length > 0) {
+    return combinedArticles;
+  }
+  throw new Error(`${source.name} did not return scrapeable website articles.`);
+}
+
+async function fetchWebsiteNewsFallback(source: NewsSource): Promise<Article[]> {
+  const hostname = hostnameFor(source.url);
+  if (!hostname) {
+    return [];
+  }
+
+  const query = encodeURIComponent(`${siteSearchQuery(hostname)} ${source.query || "AI"}`);
+  const url = `https://news.google.com/rss/search?q=${query}&hl=en-US&gl=US&ceid=US:en`;
+  const response = await fetch(url, {
+    headers: websiteHeaders("application/rss+xml,application/xml,text/xml,*/*;q=0.8"),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    return [];
+  }
+
+  return parseFeed(await response.text(), source.name).slice(0, source.limit);
 }
 
 function parseWebsite(html: string, source: NewsSource): Article[] {
@@ -67,7 +108,7 @@ function parseWebsite(html: string, source: NewsSource): Article[] {
   const links = [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
     .map((match): Article | null => {
       const url = resolveUrl(match[1] ?? "", baseUrl);
-      const title = decodeHtml(stripTags(match[2] ?? "")).replace(/\s+/g, " ").trim();
+      const title = cleanText(match[2] ?? "");
       if (!url || !title || title.length < 12) {
         return null;
       }
@@ -88,7 +129,7 @@ function parseWebsite(html: string, source: NewsSource): Article[] {
     return unique;
   }
 
-  const title = decodeHtml(stripTags(extractTag(html, "title"))).replace(/\s+/g, " ").trim();
+  const title = cleanText(extractTag(html, "title"));
   return title
     ? [
         {
@@ -115,10 +156,10 @@ function parseFeed(xml: string, source: string): Article[] {
       if (!title || !url) return null;
       return {
         id: stableId(url),
-        title: decodeHtml(stripTags(title)).trim(),
+        title: cleanText(title),
         url: decodeHtml(url).trim(),
         source,
-        summary: decodeHtml(stripTags(summary)).replace(/\s+/g, " ").trim().slice(0, 500),
+        summary: cleanText(summary).slice(0, 500),
         published: toIso(published),
         score: scoreArticle(title, summary, published, source),
       };
@@ -143,7 +184,18 @@ function stripTags(value: string) {
 }
 
 function decodeHtml(value: string) {
-  return value.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'");
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
+function cleanText(value: string) {
+  return stripTags(decodeHtml(stripTags(decodeHtml(value)))).replace(/\s+/g, " ").trim();
 }
 
 function stableId(value: string) {
@@ -184,6 +236,34 @@ function resolveUrl(url: string, baseUrl: string) {
   } catch {
     return "";
   }
+}
+
+function hostnameFor(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function siteSearchQuery(hostname: string) {
+  const hosts = equivalentHostnames(hostname);
+  return hosts.map((host) => `site:${host}`).join(" OR ");
+}
+
+function equivalentHostnames(hostname: string) {
+  if (hostname === "the-decoder.de" || hostname === "the-decoder.com") {
+    return ["the-decoder.com", "the-decoder.de"];
+  }
+  return [hostname];
+}
+
+function websiteHeaders(accept: string) {
+  return {
+    "accept": accept,
+    "accept-language": "en-US,en;q=0.9",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  };
 }
 
 function scoreArticle(title: string, summary: string, published: string, source: string) {
