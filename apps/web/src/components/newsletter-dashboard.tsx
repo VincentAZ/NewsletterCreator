@@ -58,6 +58,12 @@ type MailchimpPayload = {
 
 const preferenceIdKey = "newsletterCreator.preferenceId.v1";
 const defaultPreferenceId = "default-preferences";
+const defaultCopySystemPrompt = "Return valid JSON only.";
+const defaultScrapeModel = "openai/gpt-4.1-mini";
+const defaultScrapeSystemPrompt =
+  "You extract article candidates from source-page link context for an AI newsletter. Return valid JSON only.";
+const defaultImageSystemPrompt =
+  "Create an editorial newsletter hero image. Avoid text, logos, watermarks, UI chrome, brand marks, and distorted typography.";
 
 const emptyBalances: Balances = {
   openRouter: {
@@ -101,9 +107,9 @@ const emptySourceDraft: NewsSource = {
 
 const helpText = {
   models:
-    "Click Load models, then search and choose one copy model for newsletter text and one image model for the hero image.",
+    "Click Load models to populate the copy, AI scrape, and image model selectors. The selected models are saved as preferences.",
   sourceQueue:
-    "Turn sources on or off, edit source details, then click Gather news to fetch and dedupe articles from active sources.",
+    "Click Load models first to choose an AI scrape model, then click Gather news to fetch and dedupe articles from active sources.",
   sources:
     "Add RSS feeds or website pages, expand a source to edit its URL and limit, or reset the list back to defaults.",
   addSource:
@@ -129,8 +135,10 @@ export function NewsletterDashboard() {
   const [sourceDraft, setSourceDraft] = useState<NewsSource>(emptySourceDraft);
   const [showAddSource, setShowAddSource] = useState(false);
   const [copyModel, setCopyModel] = useState("");
+  const [scrapeModel, setScrapeModel] = useState(defaultScrapeModel);
   const [imageModel, setImageModel] = useState("");
   const [copyModelSearch, setCopyModelSearch] = useState("");
+  const [scrapeModelSearch, setScrapeModelSearch] = useState("");
   const [imageModelSearch, setImageModelSearch] = useState("");
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedArticleIds, setSelectedArticleIds] = useState<Set<string>>(new Set());
@@ -140,7 +148,10 @@ export function NewsletterDashboard() {
   const [image, setImage] = useState<GeneratedImage | null>(null);
   const [balances, setBalances] = useState<Balances>(emptyBalances);
   const [globalFeedback, setGlobalFeedback] = useState("");
+  const [scrapeSystemPrompt, setScrapeSystemPrompt] = useState(defaultScrapeSystemPrompt);
   const [imageFeedback, setImageFeedback] = useState("");
+  const [copySystemPrompt, setCopySystemPrompt] = useState(defaultCopySystemPrompt);
+  const [imageSystemPrompt, setImageSystemPrompt] = useState(defaultImageSystemPrompt);
   const [mailchimpCampaign, setMailchimpCampaign] = useState<MailchimpCampaignDraft | null>(null);
   const [status, setStatus] = useState("Load models and sources to start.");
   const [isBusy, setIsBusy] = useState(false);
@@ -167,16 +178,23 @@ export function NewsletterDashboard() {
   const filteredOpenRouterModels = useMemo(() => {
     return filterModels(openRouterModels, copyModelSearch);
   }, [copyModelSearch, openRouterModels]);
+  const filteredScrapeModels = useMemo(() => {
+    return filterModels(openRouterModels, scrapeModelSearch);
+  }, [openRouterModels, scrapeModelSearch]);
   const filteredFalModels = useMemo(() => {
     return filterModels(falModels, imageModelSearch);
   }, [falModels, imageModelSearch]);
   const selectedCopyModel = useMemo(() => {
     return openRouterModels.find((model) => model.id === copyModel) ?? null;
   }, [copyModel, openRouterModels]);
+  const selectedScrapeModel = useMemo(() => {
+    return openRouterModels.find((model) => model.id === scrapeModel) ?? null;
+  }, [openRouterModels, scrapeModel]);
   const selectedImageModel = useMemo(() => {
     return falModels.find((model) => model.id === imageModel) ?? null;
   }, [falModels, imageModel]);
 
+  const canGatherNews = openRouterModels.length > 0 && Boolean(scrapeModel) && enabledSourceCount > 0 && !isBusy;
   const canGenerateDraft = copyModel && selectedArticles.length > 0 && !isBusy;
   const canGenerateImage = draft?.imagePrompt.trim() && imageModel && !isBusy;
   const canPopulateMailchimp = Boolean(draft && image && !isBusy);
@@ -217,6 +235,9 @@ export function NewsletterDashboard() {
       if (preferences?.copyModel) {
         setCopyModel(preferences.copyModel);
       }
+      if (preferences?.scrapeModel) {
+        setScrapeModel(preferences.scrapeModel);
+      }
       if (preferences?.imageModel) {
         setImageModel(preferences.imageModel);
       }
@@ -224,6 +245,7 @@ export function NewsletterDashboard() {
         ? serializePreferences({
             sources: preferences.sources.length ? preferences.sources : defaultNewsSources,
             copyModel: preferences.copyModel ?? "",
+            scrapeModel: preferences.scrapeModel ?? "",
             imageModel: preferences.imageModel ?? "",
           })
         : "";
@@ -260,6 +282,7 @@ export function NewsletterDashboard() {
     const preferences = {
       sources,
       copyModel,
+      scrapeModel,
       imageModel,
     };
     const serialized = serializePreferences(preferences);
@@ -289,7 +312,7 @@ export function NewsletterDashboard() {
     }, 600);
 
     return () => window.clearTimeout(timeout);
-  }, [copyModel, imageModel, preferenceId, preferencesLoaded, sources]);
+  }, [copyModel, imageModel, preferenceId, preferencesLoaded, scrapeModel, sources]);
 
   useEffect(() => {
     if (!copyModelSearch.trim() || filteredOpenRouterModels.length === 0) {
@@ -299,6 +322,15 @@ export function NewsletterDashboard() {
       setCopyModel(filteredOpenRouterModels[0].id);
     }
   }, [copyModel, copyModelSearch, filteredOpenRouterModels]);
+
+  useEffect(() => {
+    if (!scrapeModelSearch.trim() || filteredScrapeModels.length === 0) {
+      return;
+    }
+    if (!filteredScrapeModels.some((model) => model.id === scrapeModel)) {
+      setScrapeModel(filteredScrapeModels[0].id);
+    }
+  }, [filteredScrapeModels, scrapeModel, scrapeModelSearch]);
 
   useEffect(() => {
     if (!imageModelSearch.trim() || filteredFalModels.length === 0) {
@@ -316,6 +348,7 @@ export function NewsletterDashboard() {
     setOpenRouterModels(payload.openRouterModels);
     setFalModels(payload.falModels);
     setCopyModel((current) => current || payload.openRouterModels[0]?.id || "");
+    setScrapeModel((current) => current || payload.openRouterModels[0]?.id || defaultScrapeModel);
     setImageModel((current) => current || payload.falModels[0]?.id || "");
     setBalances(payload.balances);
     setStatus("Models are ready. Change the selections if you want, then click Gather news.");
@@ -323,9 +356,18 @@ export function NewsletterDashboard() {
   }
 
   async function loadArticles() {
+    if (!canGatherNews) {
+      setStatus("Click Load models and choose an AI scrape model before gathering news.");
+      return;
+    }
+
     setIsBusy(true);
     setStatus("Gathering and deduping newsletter sources.");
-    const payload = await postJson<ArticlesPayload>("/api/newsletter/articles", { sources });
+    const payload = await postJson<ArticlesPayload>("/api/newsletter/articles", {
+      sources,
+      scrapeModel,
+      scrapeSystemPrompt,
+    });
     setArticles(payload.articles);
     setSelectedArticleIds(new Set(payload.articles.slice(0, 30).map((article) => article.id)));
     setSources(payload.sources?.length ? payload.sources : sources);
@@ -349,6 +391,7 @@ export function NewsletterDashboard() {
       articles: selectedArticles,
       feedback: target ? sectionFeedback(target) || globalFeedback : globalFeedback,
       previousDraft: draft,
+      systemPrompt: copySystemPrompt,
       target,
     });
 
@@ -379,6 +422,7 @@ export function NewsletterDashboard() {
         model: imageModel,
         prompt: draft.imagePrompt,
         feedback: imageFeedback,
+        systemPrompt: imageSystemPrompt,
       });
 
       if (payload.image) {
@@ -631,7 +675,7 @@ export function NewsletterDashboard() {
               <h2>Source Queue</h2>
               <HelpButton label="Source queue help">{helpText.sourceQueue}</HelpButton>
             </div>
-            <button type="button" onClick={loadArticles} disabled={isBusy || enabledSourceCount === 0}>
+            <button type="button" onClick={loadArticles} disabled={!canGatherNews}>
               Gather news
             </button>
           </div>
@@ -642,6 +686,53 @@ export function NewsletterDashboard() {
             <span>
               <strong>{selectedArticles.length}</strong> of {articles.length} articles selected
             </span>
+          </div>
+
+          <div className={`scrapeSettings ${openRouterModels.length > 0 ? "loaded" : ""}`}>
+            <div className="modelControl">
+              <label>
+                Search scrape models
+                <input
+                  value={scrapeModelSearch}
+                  onChange={(event) => setScrapeModelSearch(event.target.value)}
+                  placeholder="Model name or id"
+                  disabled={openRouterModels.length === 0}
+                />
+              </label>
+              <label>
+                AI scrape model
+                <select
+                  value={openRouterModels.length > 0 ? scrapeModel : ""}
+                  onChange={(event) => setScrapeModel(event.target.value)}
+                  disabled={openRouterModels.length === 0}
+                >
+                  {openRouterModels.length === 0 ? <option value="">Load models first</option> : null}
+                  {openRouterModels.length > 0 && !openRouterModels.some((model) => model.id === scrapeModel) ? (
+                    <option value={scrapeModel}>{scrapeModel}</option>
+                  ) : null}
+                  {filteredScrapeModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ModelCapabilities model={selectedScrapeModel} emptyLabel="Load models to inspect scrape capabilities." />
+              <span className="fieldHint">
+                {openRouterModels.length > 0
+                  ? `${filteredScrapeModels.length}/${openRouterModels.length} OpenRouter scrape models shown. Your choice is saved.`
+                  : "Click Load models to choose the OpenRouter model used for AI website scraping."}
+              </span>
+            </div>
+            <label className="fieldBlock compact">
+              AI scrape system prompt
+              <textarea
+                className="systemPromptInput"
+                value={scrapeSystemPrompt}
+                onChange={(event) => setScrapeSystemPrompt(event.target.value)}
+                placeholder={defaultScrapeSystemPrompt}
+              />
+            </label>
           </div>
 
           <section className="sourceManager">
@@ -915,6 +1006,16 @@ export function NewsletterDashboard() {
           </div>
 
           <label className="fieldBlock">
+            Copy system prompt
+            <textarea
+              className="systemPromptInput"
+              value={copySystemPrompt}
+              onChange={(event) => setCopySystemPrompt(event.target.value)}
+              placeholder={defaultCopySystemPrompt}
+            />
+          </label>
+
+          <label className="fieldBlock">
             Whole-newsletter feedback
             <textarea
               value={globalFeedback}
@@ -999,6 +1100,16 @@ export function NewsletterDashboard() {
               Generate image
             </button>
           </div>
+
+          <label className="fieldBlock">
+            Image system prompt
+            <textarea
+              className="systemPromptInput"
+              value={imageSystemPrompt}
+              onChange={(event) => setImageSystemPrompt(event.target.value)}
+              placeholder={defaultImageSystemPrompt}
+            />
+          </label>
 
           {draft ? (
             <label className="fieldBlock">
@@ -1290,11 +1401,13 @@ function normalizeDashboardSources(sources: NewsSource[]): NewsSource[] {
 function serializePreferences(input: {
   sources: NewsSource[];
   copyModel: string;
+  scrapeModel: string;
   imageModel: string;
 }) {
   return JSON.stringify({
     sources: normalizeDashboardSources(input.sources),
     copyModel: input.copyModel,
+    scrapeModel: input.scrapeModel,
     imageModel: input.imageModel,
   });
 }

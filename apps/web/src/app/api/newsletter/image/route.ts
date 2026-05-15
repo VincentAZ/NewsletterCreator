@@ -7,6 +7,7 @@ export async function POST(request: Request) {
     model?: string;
     prompt?: string;
     feedback?: string;
+    systemPrompt?: string;
   };
 
   if (!body.model) {
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
       model: body.model,
       prompt: body.prompt,
       feedback: body.feedback,
+      systemPrompt: body.systemPrompt,
     });
 
     return NextResponse.json({ image, balances: await getBalances() });

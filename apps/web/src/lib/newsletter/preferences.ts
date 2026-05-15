@@ -6,6 +6,7 @@ type PreferenceRow = {
   preference_id: string;
   sources: NewsSource[];
   copy_model: string | null;
+  scrape_model: string | null;
   image_model: string | null;
   updated_at: string;
 };
@@ -14,6 +15,7 @@ export type PreferencePayload = {
   preferenceId: string;
   sources: NewsSource[];
   copyModel: string;
+  scrapeModel: string;
   imageModel: string;
 };
 
@@ -55,6 +57,7 @@ export async function savePreferences(payload: PreferencePayload): Promise<Newsl
     preference_id: payload.preferenceId,
     sources: normalizeSources(payload.sources),
     copy_model: payload.copyModel || null,
+    scrape_model: payload.scrapeModel || null,
     image_model: payload.imageModel || null,
     updated_at: updatedAt,
   });
@@ -72,6 +75,7 @@ function rowToPreferences(row: PreferenceRow): NewsletterPreferences {
     preferenceId: row.preference_id,
     sources: normalizeSources(Array.isArray(row.sources) ? row.sources : []),
     copyModel: row.copy_model ?? "",
+    scrapeModel: row.scrape_model ?? "",
     imageModel: row.image_model ?? "",
     updatedAt: row.updated_at,
   };

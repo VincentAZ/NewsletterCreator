@@ -4,18 +4,21 @@ import { DEFAULT_NEWS_SOURCES, gatherArticles, normalizeSources } from "@/lib/ne
 import type { NewsSource } from "@/lib/newsletter/types";
 
 export async function GET() {
-  return respondWithArticles(DEFAULT_NEWS_SOURCES);
+  return respondWithArticles(DEFAULT_NEWS_SOURCES, {});
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { sources?: NewsSource[] };
-  return respondWithArticles(body.sources?.length ? normalizeSources(body.sources) : DEFAULT_NEWS_SOURCES);
+  const body = (await request.json()) as { sources?: NewsSource[]; scrapeModel?: string; scrapeSystemPrompt?: string };
+  return respondWithArticles(body.sources?.length ? normalizeSources(body.sources) : DEFAULT_NEWS_SOURCES, {
+    scrapeModel: body.scrapeModel,
+    scrapeSystemPrompt: body.scrapeSystemPrompt,
+  });
 }
 
-async function respondWithArticles(sources: NewsSource[]) {
+async function respondWithArticles(sources: NewsSource[], options: { scrapeModel?: string; scrapeSystemPrompt?: string }) {
   const balancesPromise = getBalances();
   try {
-    return NextResponse.json({ ...(await gatherArticles(sources)), sources, balances: await balancesPromise });
+    return NextResponse.json({ ...(await gatherArticles(sources, options)), sources, balances: await balancesPromise });
   } catch (error) {
     return NextResponse.json(
       {

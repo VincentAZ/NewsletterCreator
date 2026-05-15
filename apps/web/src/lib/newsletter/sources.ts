@@ -1,4 +1,14 @@
 import type { Article, NewsSource } from "./types";
+import { loadLocalEnv } from "./env";
+
+export const DEFAULT_SCRAPE_MODEL = "openai/gpt-4.1-mini";
+export const DEFAULT_SCRAPE_SYSTEM_PROMPT =
+  "You extract article candidates from source-page link context for an AI newsletter. Return valid JSON only.";
+
+type ScrapeOptions = {
+  scrapeModel?: string;
+  scrapeSystemPrompt?: string;
+};
 
 export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
   { id: "rss-hacker-news", name: "Hacker News", type: "rss", url: "https://news.ycombinator.com/rss", enabled: true, limit: 20 },
@@ -11,9 +21,12 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
   { id: "site-anthropic-news", name: "Anthropic News", type: "website", url: "https://www.anthropic.com/news", enabled: true, limit: 20 },
 ];
 
-export async function gatherArticles(sources: NewsSource[] = DEFAULT_NEWS_SOURCES): Promise<{ articles: Article[]; sourceCount: number }> {
+export async function gatherArticles(
+  sources: NewsSource[] = DEFAULT_NEWS_SOURCES,
+  options: ScrapeOptions = {},
+): Promise<{ articles: Article[]; sourceCount: number }> {
   const enabledSources = normalizeSources(sources).filter((source) => source.enabled);
-  const results = await Promise.allSettled(enabledSources.map(fetchSource));
+  const results = await Promise.allSettled(enabledSources.map((source) => fetchSource(source, options)));
   const articles = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
   return {
     articles: dedupeArticles(articles).sort((a, b) => b.score - a.score).slice(0, 60),
@@ -39,9 +52,9 @@ export function normalizeSources(sources: NewsSource[]): NewsSource[] {
     .filter((source) => source.name && source.url);
 }
 
-async function fetchSource(source: NewsSource): Promise<Article[]> {
+async function fetchSource(source: NewsSource, options: ScrapeOptions): Promise<Article[]> {
   if (source.type === "website") {
-    return scrapeWebsiteSource(source);
+    return scrapeWebsiteSource(source, options);
   }
   return fetchRssSource(source);
 }
@@ -54,7 +67,7 @@ async function fetchRssSource(source: NewsSource): Promise<Article[]> {
   return parseFeed(await response.text(), source.name).slice(0, source.limit);
 }
 
-async function scrapeWebsiteSource(source: NewsSource): Promise<Article[]> {
+async function scrapeWebsiteSource(source: NewsSource, options: ScrapeOptions): Promise<Article[]> {
   let directArticles: Article[] = [];
 
   try {
@@ -65,15 +78,18 @@ async function scrapeWebsiteSource(source: NewsSource): Promise<Article[]> {
     if (!response.ok) {
       throw new Error(`${source.name} failed with ${response.status}`);
     }
-    directArticles = parseWebsite(await response.text(), source);
+    directArticles = await scrapeWebsiteWithAi(await response.text(), source, options);
     if (directArticles.length >= source.limit) {
       return directArticles.slice(0, source.limit);
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes("AI source scraping") || error.message.includes("OPENROUTER_API_KEY"))) {
+      throw error;
+    }
     directArticles = [];
   }
 
-  const fallbackArticles = await fetchWebsiteNewsFallback(source);
+  const fallbackArticles = await fetchWebsiteNewsFallback(source, options);
   const combinedArticles = dedupeArticles([...directArticles, ...fallbackArticles])
     .sort((a, b) => b.score - a.score)
     .slice(0, source.limit);
@@ -84,7 +100,7 @@ async function scrapeWebsiteSource(source: NewsSource): Promise<Article[]> {
   throw new Error(`${source.name} did not return scrapeable website articles.`);
 }
 
-async function fetchWebsiteNewsFallback(source: NewsSource): Promise<Article[]> {
+async function fetchWebsiteNewsFallback(source: NewsSource, options: ScrapeOptions): Promise<Article[]> {
   const hostname = hostnameFor(source.url);
   if (!hostname) {
     return [];
@@ -100,49 +116,162 @@ async function fetchWebsiteNewsFallback(source: NewsSource): Promise<Article[]> 
     return [];
   }
 
-  return parseFeed(await response.text(), source.name).slice(0, source.limit);
+  return selectFeedArticlesWithAi(parseFeed(await response.text(), source.name), source, options);
 }
 
-function parseWebsite(html: string, source: NewsSource): Article[] {
-  const baseUrl = source.url;
-  const links = [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
-    .map((match): Article | null => {
+async function scrapeWebsiteWithAi(html: string, source: NewsSource, options: ScrapeOptions): Promise<Article[]> {
+  loadLocalEnv();
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY is required for AI website source scraping.");
+  }
+
+  const pageTitle = cleanText(extractTag(html, "title"));
+  const candidates = extractWebsiteLinkCandidates(html, source.url).slice(0, 80);
+  const aiCandidates = candidates.length > 0 ? candidates : pageTitle ? [{ title: pageTitle, url: source.url, summary: "Page title fallback" }] : [];
+  if (aiCandidates.length === 0) {
+    return [];
+  }
+  const model = options.scrapeModel?.trim() || process.env.OPENROUTER_SCRAPE_MODEL || process.env.OPENROUTER_MODEL || DEFAULT_SCRAPE_MODEL;
+  const content = await askAiSourceScraper({
+    model,
+    apiKey,
+    systemPrompt: options.scrapeSystemPrompt,
+    source,
+    pageTitle,
+    candidates: aiCandidates,
+  });
+
+  const parsed = parseAiArticleSelection(content);
+  return parsed
+    .map((article): Article | null => {
+      const url = resolveUrl(article.url, source.url);
+      const title = cleanText(article.title);
+      if (!url || !title) {
+        return null;
+      }
+      const summary = cleanText(article.summary).slice(0, 500) || `Story selected by AI from ${source.name}.`;
+      return {
+        id: stableId(url),
+        title,
+        url,
+        source: source.name,
+        summary,
+        published: null,
+        score: scoreArticle(title, summary, "", source.name),
+      };
+    })
+    .filter((article): article is Article => article !== null)
+    .slice(0, source.limit);
+}
+
+async function selectFeedArticlesWithAi(articles: Article[], source: NewsSource, options: ScrapeOptions): Promise<Article[]> {
+  loadLocalEnv();
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey || articles.length === 0) {
+    return [];
+  }
+
+  const model = options.scrapeModel?.trim() || process.env.OPENROUTER_SCRAPE_MODEL || process.env.OPENROUTER_MODEL || DEFAULT_SCRAPE_MODEL;
+  const content = await askAiSourceScraper({
+    model,
+    apiKey,
+    systemPrompt: options.scrapeSystemPrompt,
+    source,
+    pageTitle: `${source.name} fallback feed`,
+    candidates: articles.slice(0, 80).map((article) => ({
+      title: article.title,
+      url: article.url,
+      summary: article.summary,
+      published: article.published,
+    })),
+  });
+  const selectedUrls = new Set(parseAiArticleSelection(content).map((article) => normalizeUrl(resolveUrl(article.url, source.url))));
+  return articles.filter((article) => selectedUrls.has(normalizeUrl(article.url))).slice(0, source.limit);
+}
+
+async function askAiSourceScraper(input: {
+  model: string;
+  apiKey: string;
+  systemPrompt?: string;
+  source: NewsSource;
+  pageTitle: string;
+  candidates: Array<{ title: string; url: string; summary?: string; published?: string | null }>;
+}) {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: input.model,
+      messages: [
+        {
+          role: "system",
+          content: input.systemPrompt?.trim() || DEFAULT_SCRAPE_SYSTEM_PROMPT,
+        },
+        {
+          role: "user",
+          content: `Source: ${input.source.name}
+Source URL: ${input.source.url}
+Page title: ${input.pageTitle || "unknown"}
+Max articles: ${input.source.limit}
+
+Choose only real article/news/story links from this page context. Ignore navigation, category pages, legal pages, social links, ads, newsletters, sign-in links, and duplicate links. Prefer recent AI, model, developer, policy, product, or research stories.
+
+Return this JSON shape:
+{"articles":[{"title":"string","url":"absolute URL","summary":"one sentence reason this is a relevant story"}]}
+
+Link candidates:
+${JSON.stringify(input.candidates)}`,
+        },
+      ],
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`AI source scraping failed for ${input.source.name} with ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  return payload.choices?.[0]?.message?.content ?? "";
+}
+
+function extractWebsiteLinkCandidates(html: string, baseUrl: string) {
+  return [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+    .map((match) => {
       const url = resolveUrl(match[1] ?? "", baseUrl);
       const title = cleanText(match[2] ?? "");
       if (!url || !title || title.length < 12) {
         return null;
       }
       return {
-        id: stableId(url),
         title,
         url,
-        source: source.name,
-        summary: `Story scraped from ${source.name}.`,
-        published: null,
-        score: scoreArticle(title, "", "", source.name),
       };
     })
-    .filter((article): article is Article => article !== null);
+    .filter((candidate): candidate is { title: string; url: string } => candidate !== null)
+    .filter((candidate, index, all) => all.findIndex((item) => normalizeUrl(item.url) === normalizeUrl(candidate.url)) === index);
+}
 
-  const unique = dedupeArticles(links);
-  if (unique.length > 0) {
-    return unique;
+function parseAiArticleSelection(content: string): Array<{ title: string; url: string; summary: string }> {
+  try {
+    const value = JSON.parse(content.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "")) as {
+      articles?: Array<{ title?: unknown; url?: unknown; summary?: unknown }>;
+    };
+    return (value.articles ?? [])
+      .filter((item) => typeof item.title === "string" && typeof item.url === "string")
+      .map((item) => ({
+        title: item.title as string,
+        url: item.url as string,
+        summary: typeof item.summary === "string" ? item.summary : "",
+      }));
+  } catch {
+    return [];
   }
-
-  const title = cleanText(extractTag(html, "title"));
-  return title
-    ? [
-        {
-          id: stableId(source.url),
-          title,
-          url: source.url,
-          source: source.name,
-          summary: `Page scraped from ${source.name}.`,
-          published: null,
-          score: scoreArticle(title, "", "", source.name),
-        },
-      ]
-    : [];
 }
 
 function parseFeed(xml: string, source: string): Article[] {

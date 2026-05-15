@@ -210,6 +210,13 @@ textarea {
   gap: 0.35rem;
 }
 
+.fieldHint {
+  color: #6c7882;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
 .modelControl {
   display: grid;
   gap: 0.65rem;
@@ -404,6 +411,21 @@ textarea {
 .paneMetrics strong {
   color: #1b1f24;
   font-weight: 700;
+}
+
+.scrapeSettings {
+  background: #f6f8f9;
+  border: 1px solid #e0e6ea;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+  padding: 0.75rem;
+}
+
+.scrapeSettings.loaded {
+  background: #e8edf0;
+  border-color: #d4dde3;
 }
 
 .sourceManager,
@@ -892,6 +914,13 @@ button.helpButton:focus-visible {
 
 .fieldBlock.compact textarea {
   min-height: 4.5rem;
+}
+
+.fieldBlock textarea.systemPromptInput {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  min-height: 6.5rem;
 }
 
 .sectionStack {

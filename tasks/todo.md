@@ -1,3 +1,215 @@
+# Source Queue Scrape Picker Placeholder
+
+## Plan
+
+- [x] Adjust Source Queue so scrape model controls always use the same visible format as the Models card.
+- [x] Keep scrape model controls disabled and empty until `Load models` has populated OpenRouter models.
+- [x] Preserve Gather news disabled state until a loaded scrape model is available.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Source Queue now always shows the scrape model picker format: search field, model dropdown, capability panel, and helper text.
+- Before `Load models`, the search and dropdown are disabled, the dropdown says `Load models first`, and the capability panel shows the load-models placeholder.
+- After `Load models`, the controls populate with OpenRouter models and continue saving the selected scrape model.
+- `npm run typecheck` passed.
+- The first `npm run build` hit the recurring Windows generated `.next` `EPERM`; deleting generated `.next` output allowed a clean build to pass.
+
+---
+
+# Source Queue Model Picker Format
+
+## Plan
+
+- [x] Inspect the existing Models picker structure and Source Queue scrape settings.
+- [x] Add scrape model search/filter state using OpenRouter models.
+- [x] Replace the compact scrape selector with the same search, select, and capability-panel format used by Models.
+- [x] Preserve the existing requirement that scrape model controls appear only after `Load models`.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Source Queue now uses the same model picker format as the top Models card after `Load models`: search input, model select, and capability panel.
+- Added independent scrape model search state so filtering scrape models does not affect copy model filtering.
+- The scrape picker still remains hidden until OpenRouter models are loaded.
+- `npm run typecheck` passed.
+- The first `npm run build` hit the recurring Windows generated `.next` `EPERM`; removing generated `.next` output allowed a clean build to pass.
+
+---
+
+# Disable Gather Until Models Loaded
+
+## Plan
+
+- [x] Capture the correction in lessons.
+- [x] Inspect current Gather news enablement and status behavior.
+- [x] Disable Gather news until OpenRouter models are loaded and a scrape model is selected.
+- [x] Add a guard/status message if Gather news is invoked before model loading.
+- [x] Verify typecheck/build and document where scrape model is persisted.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- `Gather news` was enabled because the button only checked `isBusy` and active source count.
+- Added `canGatherNews`, requiring OpenRouter models to be loaded, a scrape model to be selected, active sources to exist, and no busy operation.
+- Added a defensive guard in `loadArticles` that reports: `Click Load models and choose an AI scrape model before gathering news.`
+- The scrape model choice is persisted in Supabase through the preferences API as `scrapeModel`, stored in the `newsletter_preferences.scrape_model` column.
+- `npm run typecheck` passed.
+- `npm run build` passed after deleting stale generated `.next` output inside `apps/web`.
+
+---
+
+# Explicit Model Load For Scrape Model
+
+## Plan
+
+- [x] Stop auto-loading model catalogs on dashboard startup.
+- [x] Hide Source Queue scrape model selection until `Load models` has populated OpenRouter models.
+- [x] Persist the selected scrape model in Supabase preferences and load it back after models are loaded.
+- [x] Update help/status copy to explain the `Load models` dependency.
+- [x] Update schema/types/API preference handling for `scrape_model`.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Removed automatic `/api/newsletter/models` loading from dashboard startup.
+- Source Queue now shows helper text until `Load models` is clicked, then displays the `AI scrape model` selector.
+- The selected scrape model is persisted through preferences as `scrapeModel` / `scrape_model`.
+- Updated preference types, API payload handling, and schema script for `scrape_model`.
+- Updated model/source help copy to explain that `Load models` populates copy, scrape, and image model selectors.
+- `npm run typecheck` passed.
+- The first `npm run build` hit the recurring Windows generated `.next` `EPERM`; clearing generated `.next` read-only attributes allowed the build to pass.
+
+---
+
+# Scrape Model Catalog Choices
+
+## Plan
+
+- [x] Capture the correction in lessons.
+- [x] Inspect current model-loading flow and scrape model dropdown behavior.
+- [x] Auto-load model catalogs on startup so scrape model choices are populated without a separate click.
+- [x] Improve scrape model helper text/status so it is clear the selector uses OpenRouter models.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- The scrape model selector showed one option because the OpenRouter catalog was only loaded after clicking `Load models`.
+- The dashboard now loads `/api/newsletter/models` during initial state load, so scrape/copy/image model selectors are populated automatically.
+- Added helper text under `AI scrape model` showing how many OpenRouter models are loaded.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
+# Visible AI Scrape Prompt And Model
+
+## Plan
+
+- [x] Capture the correction in lessons.
+- [x] Add source-scrape system prompt and model controls to the Source Queue section.
+- [x] Pass the selected scrape prompt/model through the articles API.
+- [x] Update website AI scraping to use request-provided prompt/model with env fallbacks.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Added an `AI scrape model` selector in Source Queue.
+- Added an editable `AI scrape system prompt` field in Source Queue.
+- The Gather news request now sends `scrapeModel` and `scrapeSystemPrompt` to `/api/newsletter/articles`.
+- Website AI scraping now uses the request-provided prompt/model, falling back to `OPENROUTER_SCRAPE_MODEL`, `OPENROUTER_MODEL`, and then `openai/gpt-4.1-mini`.
+- `npm run typecheck` passed.
+- The first `npm run build` hit the recurring Windows generated `.next` `EPERM`; clearing generated `.next` read-only attributes allowed the build to pass.
+
+---
+
+# AI Website Source Scraping
+
+## Plan
+
+- [x] Update lessons for the correction that website sources must be AI-scraped.
+- [x] Inspect the current website source scrape path and article route.
+- [x] Replace direct regex article extraction with AI-assisted extraction from fetched page context.
+- [x] Keep RSS parsing unchanged and preserve existing dedupe/scoring behavior.
+- [x] Add graceful errors when website AI scraping cannot run.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Website sources now fetch the source page and send compact link/page context to OpenRouter for AI article selection.
+- Removed the direct regex-to-article path; regex is now only used to collect candidate links for the AI scraper to evaluate.
+- If the source page has no usable links, the page-title fallback is still passed through AI before becoming an article.
+- Google News fallback candidates are also AI-selected before being accepted.
+- RSS feeds remain mechanically parsed as feeds.
+- Website AI scraping requires `OPENROUTER_API_KEY`; `OPENROUTER_SCRAPE_MODEL` can optionally override the scrape model, otherwise `OPENROUTER_MODEL` or `openai/gpt-4.1-mini` is used.
+- `npm run typecheck` passed.
+- The first build attempts hit the recurring Windows generated `.next` `EPERM`; clearing generated `.next` read-only attributes allowed `npm run build` to pass.
+
+---
+
+# Editable Generation System Prompts
+
+## Plan
+
+- [x] Inspect the current Generate Copy and Generate Image UI/API request flow.
+- [x] Add visible editable system prompt controls in both sections.
+- [x] Send the edited prompts to the copy and image generation APIs.
+- [x] Update server-side generation helpers to honor the provided prompts with sane defaults.
+- [x] Run typecheck/build verification and a local rendered-page smoke check.
+- [x] Document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+- [x] Local dashboard smoke check includes both editable prompt fields
+
+## Review
+
+- Added editable Copy system prompt and Image system prompt textareas in the Generate Copy and Generate Image sections.
+- The draft API now accepts the edited copy system prompt and passes it to OpenRouter as the chat system message, falling back to `Return valid JSON only.` when blank.
+- The image API now accepts the edited image system prompt and prepends it to the generated image prompt before fal.ai receives the request.
+- Styled the prompt editors with a compact monospace textarea treatment.
+- `npm run typecheck` passed.
+- The first `npm run build` hit the recurring Windows `.next` `EPERM`; clearing generated `.next` read-only attributes allowed the build to pass.
+- Local dashboard smoke check at `http://127.0.0.1:3000` confirmed both prompt fields render.
+
+---
+
 ---
 
 # Vercel Deployment Failure Fix

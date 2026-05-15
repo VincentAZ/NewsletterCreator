@@ -31,6 +31,7 @@ export async function PUT(request: Request) {
     preferenceId?: string;
     sources?: NewsSource[];
     copyModel?: string;
+    scrapeModel?: string;
     imageModel?: string;
   };
 
@@ -49,6 +50,7 @@ export async function PUT(request: Request) {
         preferenceId: body.preferenceId,
         sources: Array.isArray(body.sources) ? body.sources : [],
         copyModel: body.copyModel ?? "",
+        scrapeModel: body.scrapeModel ?? "",
         imageModel: body.imageModel ?? "",
       }),
     });

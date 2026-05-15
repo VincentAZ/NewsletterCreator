@@ -2,6 +2,7 @@ create table if not exists public.newsletter_preferences (
   preference_id text primary key,
   sources jsonb not null default '[]'::jsonb,
   copy_model text,
+  scrape_model text,
   image_model text,
   updated_at timestamptz not null default now()
 );
@@ -9,6 +10,7 @@ create table if not exists public.newsletter_preferences (
 alter table public.newsletter_preferences
   add column if not exists sources jsonb not null default '[]'::jsonb,
   add column if not exists copy_model text,
+  add column if not exists scrape_model text,
   add column if not exists image_model text,
   add column if not exists updated_at timestamptz not null default now();
 

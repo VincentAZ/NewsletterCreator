@@ -91,6 +91,7 @@ export type NewsletterPreferences = {
   preferenceId: string;
   sources: NewsSource[];
   copyModel: string;
+  scrapeModel: string;
   imageModel: string;
   updatedAt: string;
 };

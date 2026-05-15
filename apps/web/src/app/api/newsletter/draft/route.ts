@@ -10,6 +10,7 @@ export async function POST(request: Request) {
     articles?: Article[];
     feedback?: string;
     previousDraft?: NewsletterDraft;
+    systemPrompt?: string;
     target?: string;
   };
   if (!body.model) return NextResponse.json({ error: "model is required", balances: await getBalances() }, { status: 400 });
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
     articles: body.articles,
     feedback: body.feedback,
     previousDraft: body.previousDraft,
+    systemPrompt: body.systemPrompt,
     target: body.target,
   });
   return NextResponse.json({

@@ -53,6 +53,7 @@ export async function generateNewsletterDraft(input: {
   articles: Article[];
   feedback?: string;
   previousDraft?: NewsletterDraft;
+  systemPrompt?: string;
   target?: string;
 }): Promise<{ draft: NewsletterDraft; usedFallback: boolean; raw?: string }> {
   loadLocalEnv();
@@ -70,7 +71,7 @@ export async function generateNewsletterDraft(input: {
     body: JSON.stringify({
       model: input.model,
       messages: [
-        { role: "system", content: "Return valid JSON only." },
+        { role: "system", content: input.systemPrompt?.trim() || "Return valid JSON only." },
         { role: "user", content: buildNewsletterPrompt(input) },
       ],
       temperature: 0.4,
@@ -93,19 +94,19 @@ export async function generateNewsletterDraft(input: {
   }
 }
 
-export async function generateFalImage(input: { model: string; prompt: string; feedback?: string }): Promise<GeneratedImage> {
+export async function generateFalImage(input: { model: string; prompt: string; feedback?: string; systemPrompt?: string }): Promise<GeneratedImage> {
   loadLocalEnv();
   const apiKey = process.env.FAL_KEY;
+  const prompt = buildImagePrompt(input.prompt, input.systemPrompt, input.feedback);
   if (!apiKey) {
     return {
       url: "/newsletter-placeholder.svg",
       contentType: "image/svg+xml",
       model: input.model,
-      prompt: input.prompt,
+      prompt,
       generatedAt: new Date().toISOString(),
     };
   }
-  const prompt = input.feedback ? `${input.prompt}\n\nEditor image feedback: ${input.feedback}` : input.prompt;
   const response = await fetch(`https://fal.run/${input.model.replace(/^\/+/, "")}`, {
     method: "POST",
     headers: { Authorization: `Key ${apiKey}`, "Content-Type": "application/json" },
@@ -120,6 +121,11 @@ export async function generateFalImage(input: { model: string; prompt: string; f
     throw new Error("fal.ai did not return an image URL.");
   }
   return { url: image.url, contentType: image.content_type ?? guessContentType(image.url), model: input.model, prompt, generatedAt: new Date().toISOString() };
+}
+
+function buildImagePrompt(prompt: string, systemPrompt?: string, feedback?: string) {
+  const parts = [systemPrompt?.trim(), prompt.trim(), feedback?.trim() ? `Editor image feedback: ${feedback.trim()}` : ""].filter(Boolean);
+  return parts.join("\n\n");
 }
 
 export function fallbackOpenRouterModels(): ProviderModel[] {
