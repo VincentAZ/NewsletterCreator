@@ -25,6 +25,10 @@ $env:MAILCHIMP_LIST_ID = "..."
 $env:MAILCHIMP_TEMPLATE_ID = "123456"
 $env:MAILCHIMP_FROM_NAME = "Your newsletter"
 $env:MAILCHIMP_REPLY_TO = "newsletter@example.com"
+$env:MAILCHIMP_SECTION_PREHEADER = "preheader"
+$env:MAILCHIMP_SECTION_INTRO = "intro"
+$env:MAILCHIMP_SECTION_HERO_IMAGE = "hero_image"
+$env:MAILCHIMP_SECTION_BODY = "body"
 ```
 
 `FAL_KEY` should be an Admin key if you want the app to display account credits from fal's billing endpoint.
@@ -32,6 +36,8 @@ $env:MAILCHIMP_REPLY_TO = "newsletter@example.com"
 Supabase is required for persisted dashboard preferences. Custom sources, the selected copy model, and the selected image model are stored in the `newsletter_preferences` table under the stable `default-preferences` row.
 
 Mailchimp is configured once through `.env`. `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID`, `MAILCHIMP_TEMPLATE_ID`, `MAILCHIMP_FROM_NAME`, and `MAILCHIMP_REPLY_TO` are required to create a draft campaign. `MAILCHIMP_REPLY_TO` must be a real sender address Mailchimp accepts for the account. If `MAILCHIMP_SERVER` is omitted, the app infers it from the API key suffix, for example `us21`.
+
+The configured Mailchimp template should be a Classic template with editable section names matching `preheader`, `intro`, `hero_image`, and `body`. If your template uses different `mc:edit` names, set `MAILCHIMP_SECTION_PREHEADER`, `MAILCHIMP_SECTION_INTRO`, `MAILCHIMP_SECTION_HERO_IMAGE`, and `MAILCHIMP_SECTION_BODY`.
 
 After copy and image generation, click `Populate Mailchimp` to create a draft campaign with rendered HTML content. The app does not send or schedule campaigns.
 

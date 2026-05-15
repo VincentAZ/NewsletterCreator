@@ -5,9 +5,15 @@ type MailchimpConfig = {
   apiKey: string;
   server: string;
   listId: string;
-  templateId?: number;
+  templateId: number;
   fromName: string;
   replyTo: string;
+  sectionNames: {
+    preheader: string;
+    intro: string;
+    heroImage: string;
+    body: string;
+  };
 };
 
 type MailchimpCampaignResponse = {
@@ -49,6 +55,7 @@ export async function createMailchimpCampaignDraft(input: {
     method: "POST",
     body: JSON.stringify({
       type: "regular",
+      content_type: "template",
       recipients: {
         list_id: config.listId,
       },
@@ -68,7 +75,7 @@ export async function createMailchimpCampaignDraft(input: {
 
   await mailchimpFetch(config, `/campaigns/${campaign.id}/content`, {
     method: "PUT",
-    body: JSON.stringify(buildCampaignContent(input.draft, input.image)),
+    body: JSON.stringify(buildCampaignContent(config, input.draft, input.image)),
   });
   const checklist = await getCampaignChecklist(config, campaign.id);
 
@@ -117,12 +124,26 @@ function getMailchimpConfig(): MailchimpConfig {
     templateId: configuredTemplateId,
     fromName,
     replyTo,
+    sectionNames: {
+      preheader: process.env.MAILCHIMP_SECTION_PREHEADER?.trim() || "preheader",
+      intro: process.env.MAILCHIMP_SECTION_INTRO?.trim() || "intro",
+      heroImage: process.env.MAILCHIMP_SECTION_HERO_IMAGE?.trim() || "hero_image",
+      body: process.env.MAILCHIMP_SECTION_BODY?.trim() || "body",
+    },
   };
 }
 
-function buildCampaignContent(draft: NewsletterDraft, image: GeneratedImage) {
+function buildCampaignContent(config: MailchimpConfig, draft: NewsletterDraft, image: GeneratedImage) {
   return {
-    html: renderNewsletterHtml(draft, image),
+    template: {
+      id: config.templateId,
+      sections: {
+        [config.sectionNames.preheader]: escapeHtml(draft.preheader),
+        [config.sectionNames.intro]: renderIntroHtml(draft),
+        [config.sectionNames.heroImage]: renderHeroImageHtml(image, draft.subject),
+        [config.sectionNames.body]: renderSectionsHtml(draft),
+      },
+    },
     plain_text: renderNewsletterText(draft),
   };
 }

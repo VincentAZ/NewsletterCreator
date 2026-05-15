@@ -1,3 +1,28 @@
+# Mailchimp Template ID Commit
+
+## Plan
+
+- [x] Inspect Mailchimp environment values and current API helper behavior.
+- [x] Fix the malformed local `MAILCHIMP_REPLY_TO` value.
+- [x] Use the configured Mailchimp template ID when setting campaign content.
+- [x] Run typecheck/build verification.
+- [x] Commit the change for production testing.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Fixed the malformed local `MAILCHIMP_REPLY_TO` value.
+- Mailchimp campaign creation now marks campaigns as template content and sets content with the configured `MAILCHIMP_TEMPLATE_ID`.
+- Added default editable section names of `preheader`, `intro`, `hero_image`, and `body`, with optional `.env` overrides for templates that use different `mc:edit` names.
+- `npm run typecheck` passed.
+- The first `npm run build` hit the recurring Windows generated `.next` `EPERM`; deleting generated `.next` output allowed a clean build to pass.
+
+---
+
 # Source Queue Scrape Picker Placeholder
 
 ## Plan
