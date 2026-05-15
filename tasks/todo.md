@@ -1,5 +1,34 @@
 ---
 
+# Vercel Deployment Failure Fix
+
+## Plan
+
+- [x] Inspect project/package/Vercel-relevant configuration.
+- [x] Reproduce the deploy build failure locally.
+- [x] Fix the root cause with the smallest viable change.
+- [x] Run verification commands that cover Vercel's build path.
+- [x] Document the result and any deploy follow-up.
+
+## Verification
+
+- [x] `npm run build`
+- [x] `npm run typecheck`
+- [x] `git ls-files | rg '(^|/)\.next/'` returns no tracked `.next` files
+
+## Review
+
+- The app build itself was not failing locally; `npm run build` completed successfully.
+- Vercel's log included the key warning: `.next` was uploaded, and the deployment entered `@vercel/next` legacy mode.
+- Confirmed `apps/web/.next` was committed/tracked in git, including generated build and dev artifacts.
+- Added `.next` and `apps/web/.next` to `.gitignore`.
+- Removed `apps/web/.next` from git tracking with `git rm --cached -r`, leaving local generated files alone.
+- `npm run typecheck` passed.
+- `npm run build` passed after the generated artifacts were untracked.
+- No `.next` files remain in `git ls-files`, so the next Vercel deployment should build from source instead of uploaded build output.
+
+---
+
 # Website Source Partial Result Fix
 
 ## Plan

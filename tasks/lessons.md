@@ -10,3 +10,4 @@
 - For this app, treat Mailchimp as a single-user, single-template integration. Do not add dashboard/database complexity for switching templates or section maps unless the user explicitly asks for multi-template support.
 - For website source gathering, do not treat any nonzero scrape result as complete. If direct scraping returns fewer than the source limit, supplement from the fallback feed before applying the limit.
 - When reproducing a source-gathering bug, use the exact persisted source URL from preferences. Similar domains can have very different fallback coverage, as with `the-decoder.de` versus `the-decoder.com`.
+- After fixing a deployment failure locally, compare the failed deploy commit with local `HEAD` and the remote branch before declaring the fix ready; Vercel only sees pushed commits from the connected repository.
