@@ -18,6 +18,8 @@ $env:OPENROUTER_API_KEY = "sk-or-..."
 $env:FAL_KEY = "..."
 $env:SUPABASE_URL = "https://your-project.supabase.co"
 $env:SUPABASE_SERVICE_ROLE_KEY = "..."
+$env:SUPABASE_DB_URL = "postgresql://postgres..."
+$env:SUPABASE_DB_PASSWORD = "..."
 $env:MAILCHIMP_API_KEY = "..."
 $env:MAILCHIMP_LIST_ID = "..."
 $env:MAILCHIMP_TEMPLATE_ID = "123456"
@@ -27,25 +29,22 @@ $env:MAILCHIMP_REPLY_TO = "newsletter@example.com"
 
 `FAL_KEY` should be an Admin key if you want the app to display account credits from fal's billing endpoint.
 
-Supabase is optional. When configured, the app saves only user preferences: custom sources and the last selected copy/image models. Without Supabase, the dashboard falls back to browser `localStorage`.
+Supabase is required for persisted dashboard preferences. Custom sources, the selected copy model, and the selected image model are stored in the `newsletter_preferences` table under the stable `default-preferences` row.
 
-Mailchimp is optional. `MAILCHIMP_API_KEY` and `MAILCHIMP_LIST_ID` are required to create a draft campaign. `MAILCHIMP_TEMPLATE_ID` can be set in `.env` or entered in the dashboard. If `MAILCHIMP_SERVER` is omitted, the app infers it from the API key suffix, for example `us21`.
+Mailchimp is configured once through `.env`. `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID`, `MAILCHIMP_TEMPLATE_ID`, `MAILCHIMP_FROM_NAME`, and `MAILCHIMP_REPLY_TO` are required to create a draft campaign. `MAILCHIMP_REPLY_TO` must be a real sender address Mailchimp accepts for the account. If `MAILCHIMP_SERVER` is omitted, the app infers it from the API key suffix, for example `us21`.
 
-The Mailchimp template should expose editable sections matching the dashboard defaults:
+After copy and image generation, click `Populate Mailchimp` to create a draft campaign with rendered HTML content. The app does not send or schedule campaigns.
 
-```html
-<div mc:edit="preheader"></div>
-<div mc:edit="intro"></div>
-<div mc:edit="hero_image"></div>
-<div mc:edit="body"></div>
+Apply or update the Supabase schema:
+
+```powershell
+npm run db:ensure-schema
 ```
 
-After copy and image generation, click `Populate Mailchimp` to create a draft campaign and fill those sections. The app does not send or schedule campaigns.
-
-Create this table in Supabase:
+The schema command requires `psql` to be installed. It uses `SUPABASE_DB_URL` or `DATABASE_URL`; if those are not set, it can derive the connection from `SUPABASE_URL` plus `SUPABASE_DB_PASSWORD`. It applies this idempotent schema:
 
 ```sql
-create table if not exists newsletter_preferences (
+create table if not exists public.newsletter_preferences (
   preference_id text primary key,
   sources jsonb not null default '[]'::jsonb,
   copy_model text,

@@ -5,7 +5,8 @@
     "dev": "npm run dev --workspace apps/web",
     "build": "npm run build --workspace apps/web",
     "typecheck": "npm run typecheck --workspace apps/web",
-    "lint": "npm run lint --workspace apps/web"
+    "lint": "npm run lint --workspace apps/web",
+    "db:ensure-schema": "node scripts/ensure-supabase-schema.mjs"
   },
   "workspaces": [
     "apps/web"

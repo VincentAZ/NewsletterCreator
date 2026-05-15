@@ -50,20 +50,13 @@ export async function savePreferences(payload: PreferencePayload): Promise<Newsl
     return null;
   }
 
-  const response = await fetch(`${client.url}/rest/v1/newsletter_preferences?on_conflict=preference_id`, {
-    method: "POST",
-    headers: {
-      ...client.headers,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=representation",
-    },
-    body: JSON.stringify({
-      preference_id: payload.preferenceId,
-      sources: normalizeSources(payload.sources),
-      copy_model: payload.copyModel || null,
-      image_model: payload.imageModel || null,
-      updated_at: new Date().toISOString(),
-    }),
+  const updatedAt = new Date().toISOString();
+  const response = await upsertPreferenceRow(client, {
+    preference_id: payload.preferenceId,
+    sources: normalizeSources(payload.sources),
+    copy_model: payload.copyModel || null,
+    image_model: payload.imageModel || null,
+    updated_at: updatedAt,
   });
 
   if (!response.ok) {
@@ -75,16 +68,35 @@ export async function savePreferences(payload: PreferencePayload): Promise<Newsl
 }
 
 function rowToPreferences(row: PreferenceRow): NewsletterPreferences {
-  return {
+  const preferences: NewsletterPreferences = {
     preferenceId: row.preference_id,
     sources: normalizeSources(Array.isArray(row.sources) ? row.sources : []),
     copyModel: row.copy_model ?? "",
     imageModel: row.image_model ?? "",
     updatedAt: row.updated_at,
   };
+
+  return preferences;
 }
 
-function getSupabaseRestClient() {
+type SupabaseRestClient = {
+  url: string;
+  headers: Record<string, string>;
+};
+
+function upsertPreferenceRow(client: SupabaseRestClient, body: Record<string, unknown>) {
+  return fetch(`${client.url}/rest/v1/newsletter_preferences?on_conflict=preference_id`, {
+    method: "POST",
+    headers: {
+      ...client.headers,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=representation",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function getSupabaseRestClient(): SupabaseRestClient | null {
   loadLocalEnv();
   const url = getSupabaseUrl();
   const key = getSupabaseKey();

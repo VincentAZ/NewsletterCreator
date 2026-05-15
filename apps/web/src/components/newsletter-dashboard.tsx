@@ -1,12 +1,11 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import type {
   Article,
   Balances,
   GeneratedImage,
   MailchimpCampaignDraft,
-  MailchimpSectionMap,
   NewsSource,
   NewsletterPreferences,
   NewsletterDraft,
@@ -58,7 +57,7 @@ type MailchimpPayload = {
 };
 
 const preferenceIdKey = "newsletterCreator.preferenceId.v1";
-const localPreferencesKey = "newsletterCreator.preferences.v1";
+const defaultPreferenceId = "default-preferences";
 
 const emptyBalances: Balances = {
   openRouter: {
@@ -100,11 +99,27 @@ const emptySourceDraft: NewsSource = {
   query: "",
 };
 
-const defaultMailchimpSectionMap: MailchimpSectionMap = {
-  preheader: "preheader",
-  intro: "intro",
-  heroImage: "hero_image",
-  body: "body",
+const helpText = {
+  models:
+    "Click Load models, then search and choose one copy model for newsletter text and one image model for the hero image.",
+  sourceQueue:
+    "Turn sources on or off, edit source details, then click Gather news to fetch and dedupe articles from active sources.",
+  sources:
+    "Add RSS feeds or website pages, expand a source to edit its URL and limit, or reset the list back to defaults.",
+  addSource:
+    "Name the source, choose RSS feed or website scrape, set the max item count, enter the URL, then click Add source.",
+  sourceCard:
+    "Use the switch to include this source, open the row to edit details, or delete it from the queue.",
+  articles:
+    "Select the stories to include in the draft. Use the filter and quick selection buttons to control what the copy model sees.",
+  draft:
+    "Click Generate copy after selecting articles. Edit subject, preheader, intro, section text, and feedback before regenerating any part.",
+  draftSection:
+    "Edit the section heading and summary, review the included stories, add section feedback, then regenerate only this section if needed.",
+  heroImage:
+    "After copy is generated, edit the image prompt or feedback, choose an image model, then click Generate image.",
+  mailchimp:
+    "Creates a draft campaign in the single Mailchimp template configured in .env after copy and image are ready.",
 };
 
 export function NewsletterDashboard() {
@@ -126,8 +141,6 @@ export function NewsletterDashboard() {
   const [balances, setBalances] = useState<Balances>(emptyBalances);
   const [globalFeedback, setGlobalFeedback] = useState("");
   const [imageFeedback, setImageFeedback] = useState("");
-  const [mailchimpTemplateId, setMailchimpTemplateId] = useState("");
-  const [mailchimpSectionMap, setMailchimpSectionMap] = useState<MailchimpSectionMap>(defaultMailchimpSectionMap);
   const [mailchimpCampaign, setMailchimpCampaign] = useState<MailchimpCampaignDraft | null>(null);
   const [status, setStatus] = useState("Load models and sources to start.");
   const [isBusy, setIsBusy] = useState(false);
@@ -179,13 +192,24 @@ export function NewsletterDashboard() {
     let isMounted = true;
 
     async function loadInitialState() {
-      const id = getOrCreatePreferenceId();
+      const { preferenceId: id, legacyPreferenceId } = getPreferenceIdentity();
       setPreferenceId(id);
 
       const preferencesPayload = await fetchJson<PreferencesPayload>(
         `/api/newsletter/preferences?preferenceId=${encodeURIComponent(id)}`,
       );
-      const preferences = preferencesPayload.configured ? preferencesPayload.preferences : loadLocalPreferences();
+      let preferences = preferencesPayload.configured ? preferencesPayload.preferences : null;
+      let shouldMigrateLegacyPreferences = false;
+
+      if (!preferences && preferencesPayload.configured && legacyPreferenceId && legacyPreferenceId !== id) {
+        const legacyPayload = await fetchJson<PreferencesPayload>(
+          `/api/newsletter/preferences?preferenceId=${encodeURIComponent(legacyPreferenceId)}`,
+        );
+        if (legacyPayload.configured && legacyPayload.preferences) {
+          preferences = legacyPayload.preferences;
+          shouldMigrateLegacyPreferences = true;
+        }
+      }
 
       if (preferences?.sources.length) {
         setSources(normalizeDashboardSources(preferences.sources));
@@ -196,33 +220,30 @@ export function NewsletterDashboard() {
       if (preferences?.imageModel) {
         setImageModel(preferences.imageModel);
       }
-      lastSavedPreferences.current = serializePreferences({
-        sources: preferences?.sources.length ? preferences.sources : defaultNewsSources,
-        copyModel: preferences?.copyModel ?? "",
-        imageModel: preferences?.imageModel ?? "",
-      });
+      lastSavedPreferences.current = preferences && !shouldMigrateLegacyPreferences
+        ? serializePreferences({
+            sources: preferences.sources.length ? preferences.sources : defaultNewsSources,
+            copyModel: preferences.copyModel ?? "",
+            imageModel: preferences.imageModel ?? "",
+          })
+        : "";
 
       const payload = await fetchJson<{ balances: Balances }>("/api/newsletter/balances");
       if (isMounted) {
         setBalances(payload.balances);
         setPreferencesLoaded(true);
+        if (!preferencesPayload.configured) {
+          setStatus("Supabase is required to persist dashboard preferences. Add Supabase env vars and run the schema script.");
+        } else if (preferencesPayload.error) {
+          setStatus(preferencesPayload.error);
+        }
       }
     }
 
     void loadInitialState().catch(() => {
       if (isMounted) {
-        const preferences = loadLocalPreferences();
-        if (preferences?.sources.length) {
-          setSources(normalizeDashboardSources(preferences.sources));
-        }
-        if (preferences?.copyModel) {
-          setCopyModel(preferences.copyModel);
-        }
-        if (preferences?.imageModel) {
-          setImageModel(preferences.imageModel);
-        }
         setPreferencesLoaded(true);
-        setStatus("Preferences or balance check failed. Load models to retry provider checks.");
+        setStatus("Database preferences failed to load. Check Supabase configuration and schema.");
       }
     });
 
@@ -236,21 +257,35 @@ export function NewsletterDashboard() {
       return;
     }
 
-    const preferences = { sources, copyModel, imageModel };
+    const preferences = {
+      sources,
+      copyModel,
+      imageModel,
+    };
     const serialized = serializePreferences(preferences);
     if (serialized === lastSavedPreferences.current) {
       return;
     }
 
     const timeout = window.setTimeout(() => {
-      localStorage.setItem(localPreferencesKey, serialized);
-      lastSavedPreferences.current = serialized;
       void putJson<PreferencesPayload>("/api/newsletter/preferences", {
         preferenceId,
         ...preferences,
-      }).catch(() => {
-        // Local preferences have already been saved; the API can retry on the next change.
-      });
+      })
+        .then((payload) => {
+          if (!payload.configured) {
+            setStatus("Supabase is required to persist dashboard preferences. Add Supabase env vars and run the schema script.");
+            return;
+          }
+          if (payload.error) {
+            setStatus(payload.error);
+            return;
+          }
+          lastSavedPreferences.current = serialized;
+        })
+        .catch(() => {
+          setStatus("Database preferences failed to save. Check Supabase configuration and schema.");
+        });
     }, 600);
 
     return () => window.clearTimeout(timeout);
@@ -338,48 +373,56 @@ export function NewsletterDashboard() {
     }
 
     setIsBusy(true);
-    setStatus("Generating hero image with fal.ai.");
-    const payload = await postJson<ImagePayload>("/api/newsletter/image", {
-      model: imageModel,
-      prompt: draft.imagePrompt,
-      feedback: imageFeedback,
-    });
+    try {
+      setStatus("Generating hero image with fal.ai.");
+      const payload = await postJson<ImagePayload>("/api/newsletter/image", {
+        model: imageModel,
+        prompt: draft.imagePrompt,
+        feedback: imageFeedback,
+      });
 
-    if (payload.image) {
-      setImage(payload.image);
-      setStatus("Hero image generated.");
-    } else {
-      setStatus(payload.error ?? "Image generation failed.");
+      if (payload.image) {
+        setImage(payload.image);
+        setStatus("Hero image generated.");
+      } else {
+        setStatus(payload.error ?? "Image generation failed.");
+      }
+
+      setBalances(payload.balances);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Image generation failed.");
+    } finally {
+      setIsBusy(false);
     }
-
-    setBalances(payload.balances);
-    setIsBusy(false);
   }
 
   async function populateMailchimpTemplate() {
     if (!draft || !image || !canPopulateMailchimp) {
+      setStatus("Generate copy and image before populating Mailchimp.");
       return;
     }
 
     setIsBusy(true);
-    setStatus("Creating a Mailchimp draft campaign and populating the template.");
+    try {
+      setStatus("Creating a Mailchimp draft campaign and populating the template.");
 
-    const templateId = Number(mailchimpTemplateId);
-    const payload = await postJson<MailchimpPayload>("/api/newsletter/mailchimp", {
-      draft,
-      image,
-      templateId: Number.isFinite(templateId) && templateId > 0 ? templateId : undefined,
-      sectionMap: mailchimpSectionMap,
-    });
+      const payload = await postJson<MailchimpPayload>("/api/newsletter/mailchimp", {
+        draft,
+        image,
+      });
 
-    if (payload.campaign) {
-      setMailchimpCampaign(payload.campaign);
-      setStatus(`Mailchimp draft created: ${payload.campaign.title}. Review it in Mailchimp before sending.`);
-    } else {
-      setStatus(payload.error ?? "Mailchimp template population failed.");
+      if (payload.campaign) {
+        setMailchimpCampaign(payload.campaign);
+        const checklist = payload.campaign.checklist?.length ? ` Mailchimp still reports: ${payload.campaign.checklist.join(" ")}` : "";
+        setStatus(`Mailchimp draft created: ${payload.campaign.title}. Review it in Mailchimp before sending.${checklist}`);
+      } else {
+        setStatus(payload.error ?? "Mailchimp template population failed.");
+      }
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Mailchimp template population failed.");
+    } finally {
+      setIsBusy(false);
     }
-
-    setIsBusy(false);
   }
 
   function toggleArticle(id: string) {
@@ -485,16 +528,22 @@ export function NewsletterDashboard() {
     });
   }
 
+  function deleteSection(sectionIndex: number) {
+    setDraft((current) => {
+      if (!current || current.sections.length <= 1) {
+        return current;
+      }
+      const sections = current.sections.filter((_, index) => index !== sectionIndex);
+      return { ...current, sections };
+    });
+  }
+
   function sectionFeedback(target: string) {
     if (!draft) {
       return "";
     }
     const section = draft.sections.find((candidate) => candidate.id === target);
     return section?.feedback ?? "";
-  }
-
-  function updateMailchimpSection(field: keyof MailchimpSectionMap, value: string) {
-    setMailchimpSectionMap((current) => ({ ...current, [field]: value.trim() }));
   }
 
   return (
@@ -511,6 +560,13 @@ export function NewsletterDashboard() {
       </header>
 
       <section className="toolbar">
+        <div className="toolbarIntro">
+          <div>
+            <h2>Models</h2>
+            <span>Copy and image setup</span>
+          </div>
+          <HelpButton label="Models help">{helpText.models}</HelpButton>
+        </div>
         <div className="modelControl">
           <label>
             Search copy models
@@ -571,7 +627,10 @@ export function NewsletterDashboard() {
       <main className="workspace">
         <aside className="sourcePane">
           <div className="paneHeader">
-            <h2>Source Queue</h2>
+            <div className="headerTitle">
+              <h2>Source Queue</h2>
+              <HelpButton label="Source queue help">{helpText.sourceQueue}</HelpButton>
+            </div>
             <button type="button" onClick={loadArticles} disabled={isBusy || enabledSourceCount === 0}>
               Gather news
             </button>
@@ -587,7 +646,10 @@ export function NewsletterDashboard() {
 
           <section className="sourceManager">
             <div className="sectionHeader">
-              <h3>Sources</h3>
+              <div className="sectionTitle">
+                <h3>Sources</h3>
+                <HelpButton label="Sources help">{helpText.sources}</HelpButton>
+              </div>
               <div className="sectionActions">
                 <button
                   type="button"
@@ -614,6 +676,10 @@ export function NewsletterDashboard() {
 
             {showAddSource ? (
               <div className="sourceForm">
+                <div className="formHeader">
+                  <strong>Add Source</strong>
+                  <HelpButton label="Add source help">{helpText.addSource}</HelpButton>
+                </div>
                 <label className="fieldBlock compact">
                   Name
                   <input
@@ -696,6 +762,7 @@ export function NewsletterDashboard() {
                           {source.type === "rss" ? "RSS" : "Web"} · {source.limit}
                         </span>
                       </button>
+                      <HelpButton label={`${source.name || "Source"} help`}>{helpText.sourceCard}</HelpButton>
                       <button
                         type="button"
                         className="iconButton ghost danger"
@@ -761,9 +828,12 @@ export function NewsletterDashboard() {
 
           <section className="articleSection">
             <div className="sectionHeader">
-              <h3>
-                Articles{articles.length > 0 ? <span className="count"> ({visibleArticles.length})</span> : null}
-              </h3>
+              <div className="sectionTitle">
+                <h3>
+                  Articles{articles.length > 0 ? <span className="count"> ({visibleArticles.length})</span> : null}
+                </h3>
+                <HelpButton label="Articles help">{helpText.articles}</HelpButton>
+              </div>
               {articles.length > 0 ? (
                 <select
                   className="articleFilter"
@@ -835,7 +905,10 @@ export function NewsletterDashboard() {
 
         <section className="editorPane">
           <div className="paneHeader">
-            <h2>Draft Review</h2>
+            <div className="headerTitle">
+              <h2>Draft Review</h2>
+              <HelpButton label="Draft review help">{helpText.draft}</HelpButton>
+            </div>
             <button type="button" onClick={() => generateDraft()} disabled={!canGenerateDraft}>
               Generate copy
             </button>
@@ -869,6 +942,7 @@ export function NewsletterDashboard() {
                         value={section.heading}
                         onChange={(event) => updateSection(sectionIndex, { ...section, heading: event.target.value })}
                       />
+                      <HelpButton label={`${section.heading || "Draft section"} help`}>{helpText.draftSection}</HelpButton>
                     </div>
                     <textarea
                       value={section.summary}
@@ -888,9 +962,20 @@ export function NewsletterDashboard() {
                         onChange={(event) => updateSection(sectionIndex, { ...section, feedback: event.target.value })}
                       />
                     </label>
-                    <button type="button" onClick={() => generateDraft(section.id)} disabled={isBusy}>
-                      Regenerate section
-                    </button>
+                    <div className="sectionControls">
+                      <button type="button" onClick={() => generateDraft(section.id)} disabled={isBusy}>
+                        Regenerate section
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost danger"
+                        onClick={() => deleteSection(sectionIndex)}
+                        disabled={isBusy || draft.sections.length <= 1}
+                        title={draft.sections.length <= 1 ? "Keep at least one section" : `Delete ${section.heading || "section"}`}
+                      >
+                        Delete section
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -906,7 +991,10 @@ export function NewsletterDashboard() {
 
         <aside className="publishPane">
           <div className="paneHeader">
-            <h2>Hero Image</h2>
+            <div className="headerTitle">
+              <h2>Hero Image</h2>
+              <HelpButton label="Hero image help">{helpText.heroImage}</HelpButton>
+            </div>
             <button type="button" onClick={generateImage} disabled={!canGenerateImage}>
               Generate image
             </button>
@@ -934,50 +1022,10 @@ export function NewsletterDashboard() {
 
           <section className="mailchimpPanel">
             <div className="sectionHeader">
-              <h3>Mailchimp Template</h3>
-            </div>
-            <label className="fieldBlock compact">
-              Template ID
-              <input
-                value={mailchimpTemplateId}
-                onChange={(event) => setMailchimpTemplateId(event.target.value)}
-                placeholder="Uses MAILCHIMP_TEMPLATE_ID if blank"
-                inputMode="numeric"
-              />
-            </label>
-            <div className="mailchimpSectionGrid">
-              <label className="fieldBlock compact">
-                Preheader
-                <input
-                  value={mailchimpSectionMap.preheader ?? ""}
-                  onChange={(event) => updateMailchimpSection("preheader", event.target.value)}
-                  placeholder="preheader"
-                />
-              </label>
-              <label className="fieldBlock compact">
-                Intro
-                <input
-                  value={mailchimpSectionMap.intro}
-                  onChange={(event) => updateMailchimpSection("intro", event.target.value)}
-                  placeholder="intro"
-                />
-              </label>
-              <label className="fieldBlock compact">
-                Hero image
-                <input
-                  value={mailchimpSectionMap.heroImage}
-                  onChange={(event) => updateMailchimpSection("heroImage", event.target.value)}
-                  placeholder="hero_image"
-                />
-              </label>
-              <label className="fieldBlock compact">
-                Body
-                <input
-                  value={mailchimpSectionMap.body}
-                  onChange={(event) => updateMailchimpSection("body", event.target.value)}
-                  placeholder="body"
-                />
-              </label>
+              <div className="sectionTitle">
+                <h3>Mailchimp Template</h3>
+                <HelpButton label="Mailchimp template help">{helpText.mailchimp}</HelpButton>
+              </div>
             </div>
             <button type="button" onClick={populateMailchimpTemplate} disabled={!canPopulateMailchimp}>
               Populate Mailchimp
@@ -999,6 +1047,21 @@ export function NewsletterDashboard() {
         </aside>
       </main>
     </div>
+  );
+}
+
+function HelpButton({ label, children }: { label: string; children: string }) {
+  const tooltipId = useId();
+
+  return (
+    <span className="helpControl">
+      <button type="button" className="helpButton" aria-label={label} aria-describedby={tooltipId} title={children}>
+        ?
+      </button>
+      <span id={tooltipId} role="tooltip" className="helpTooltip">
+        {children}
+      </span>
+    </span>
   );
 }
 
@@ -1172,7 +1235,7 @@ function normalizeSearchText(value: string) {
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
-  return (await response.json()) as T;
+  return parseJsonResponse<T>(response);
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
@@ -1181,7 +1244,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  return (await response.json()) as T;
+  return parseJsonResponse<T>(response);
 }
 
 async function putJson<T>(url: string, body: unknown): Promise<T> {
@@ -1190,42 +1253,26 @@ async function putJson<T>(url: string, body: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  return (await response.json()) as T;
+  return parseJsonResponse<T>(response);
 }
 
-function getOrCreatePreferenceId() {
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const payload = (await response.json().catch(() => ({}))) as { error?: string };
+  if (!response.ok) {
+    throw new Error(payload.error ?? `Request failed with ${response.status}.`);
+  }
+  return payload as T;
+}
+
+function getPreferenceIdentity() {
   const existing = localStorage.getItem(preferenceIdKey);
-  if (existing) {
-    return existing;
+  if (existing !== defaultPreferenceId) {
+    localStorage.setItem(preferenceIdKey, defaultPreferenceId);
   }
-
-  const next = crypto.randomUUID();
-  localStorage.setItem(preferenceIdKey, next);
-  return next;
-}
-
-function loadLocalPreferences(): NewsletterPreferences | null {
-  try {
-    const raw = localStorage.getItem(localPreferencesKey);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<NewsletterPreferences>;
-    if (!Array.isArray(parsed.sources)) {
-      return null;
-    }
-
-    return {
-      preferenceId: typeof parsed.preferenceId === "string" ? parsed.preferenceId : "",
-      sources: parsed.sources,
-      copyModel: typeof parsed.copyModel === "string" ? parsed.copyModel : "",
-      imageModel: typeof parsed.imageModel === "string" ? parsed.imageModel : "",
-      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : "",
-    };
-  } catch {
-    return null;
-  }
+  return {
+    preferenceId: defaultPreferenceId,
+    legacyPreferenceId: existing || null,
+  };
 }
 
 function normalizeDashboardSources(sources: NewsSource[]): NewsSource[] {
@@ -1240,7 +1287,11 @@ function normalizeDashboardSources(sources: NewsSource[]): NewsSource[] {
   });
 }
 
-function serializePreferences(input: { sources: NewsSource[]; copyModel: string; imageModel: string }) {
+function serializePreferences(input: {
+  sources: NewsSource[];
+  copyModel: string;
+  imageModel: string;
+}) {
   return JSON.stringify({
     sources: normalizeDashboardSources(input.sources),
     copyModel: input.copyModel,

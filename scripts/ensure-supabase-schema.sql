@@ -1,0 +1,24 @@
+create table if not exists public.newsletter_preferences (
+  preference_id text primary key,
+  sources jsonb not null default '[]'::jsonb,
+  copy_model text,
+  image_model text,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.newsletter_preferences
+  add column if not exists sources jsonb not null default '[]'::jsonb,
+  add column if not exists copy_model text,
+  add column if not exists image_model text,
+  add column if not exists updated_at timestamptz not null default now();
+
+update public.newsletter_preferences
+set
+  sources = coalesce(sources, '[]'::jsonb),
+  updated_at = coalesce(updated_at, now());
+
+alter table public.newsletter_preferences
+  alter column sources set default '[]'::jsonb,
+  alter column sources set not null,
+  alter column updated_at set default now(),
+  alter column updated_at set not null;

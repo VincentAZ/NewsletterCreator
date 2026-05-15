@@ -175,6 +175,28 @@ textarea {
   padding: 0.75rem;
 }
 
+.toolbarIntro {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.toolbarIntro h2 {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.toolbarIntro > div > span {
+  color: #66727d;
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .toolbar button {
   min-width: 9rem;
 }
@@ -341,6 +363,25 @@ textarea {
   margin: 0;
 }
 
+.headerTitle,
+.sectionTitle,
+.formHeader {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.formHeader {
+  justify-content: space-between;
+}
+
+.formHeader strong {
+  color: #44505a;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
 .paneHeader > button {
   min-width: 8.5rem;
 }
@@ -397,6 +438,97 @@ textarea {
 .sectionHeader h3 .count {
   color: #8593a0;
   font-weight: 600;
+}
+
+.helpControl {
+  display: inline-flex;
+  flex-shrink: 0;
+  position: relative;
+}
+
+button.helpButton {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #b8c3ca;
+  border-radius: 999px;
+  color: #44505a;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  height: 1.55rem;
+  justify-content: center;
+  line-height: 1;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  width: 1.55rem;
+}
+
+.toolbar button.helpButton {
+  justify-self: auto;
+  min-width: 0;
+}
+
+button.helpButton:hover,
+button.helpButton:focus-visible {
+  background: #234b5f;
+  border-color: #234b5f;
+  color: #fff;
+}
+
+button.helpButton:focus-visible {
+  outline: 2px solid #7aa6b9;
+  outline-offset: 2px;
+}
+
+.helpTooltip {
+  background: #1f2930;
+  border-radius: 6px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  left: 50%;
+  line-height: 1.4;
+  max-width: min(18rem, calc(100vw - 2rem));
+  opacity: 0;
+  padding: 0.55rem 0.65rem;
+  pointer-events: none;
+  position: absolute;
+  text-transform: none;
+  top: calc(100% + 0.45rem);
+  transform: translateX(-50%) translateY(-0.2rem);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  visibility: hidden;
+  width: max-content;
+  z-index: 20;
+}
+
+.helpControl:hover .helpTooltip,
+.helpControl:focus-within .helpTooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  visibility: visible;
+}
+
+.paneHeader .helpTooltip,
+.sectionHeader .helpTooltip,
+.sourceCardTop .helpTooltip,
+.sectionTopline .helpTooltip {
+  left: auto;
+  right: 0;
+  transform: translateY(-0.2rem);
+}
+
+.paneHeader .helpControl:hover .helpTooltip,
+.paneHeader .helpControl:focus-within .helpTooltip,
+.sectionHeader .helpControl:hover .helpTooltip,
+.sectionHeader .helpControl:focus-within .helpTooltip,
+.sourceCardTop .helpControl:hover .helpTooltip,
+.sourceCardTop .helpControl:focus-within .helpTooltip,
+.sectionTopline .helpControl:hover .helpTooltip,
+.sectionTopline .helpControl:focus-within .helpTooltip {
+  transform: translateY(0);
 }
 
 .sectionActions {
@@ -472,7 +604,7 @@ textarea {
   align-items: center;
   display: grid;
   gap: 0.4rem;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
 }
 
 .sourceSummary {
@@ -780,6 +912,17 @@ textarea {
   font-weight: 800;
 }
 
+.sectionControls {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.sectionControls .danger {
+  border-color: #d7a7a7;
+  color: #9b1c1c;
+}
+
 .storyItem {
   background: #f6f8f9;
   border: 1px solid #e0e6ea;
@@ -812,12 +955,6 @@ textarea {
   display: grid;
   gap: 0.75rem;
   padding-top: 0.85rem;
-}
-
-.mailchimpSectionGrid {
-  display: grid;
-  gap: 0.55rem;
-  grid-template-columns: 1fr 1fr;
 }
 
 .mailchimpResult {
@@ -901,7 +1038,8 @@ textarea {
     min-width: 0;
   }
 
-  .mailchimpSectionGrid {
+  .sectionControls {
     grid-template-columns: 1fr;
   }
+
 }

@@ -78,19 +78,13 @@ export type GeneratedImage = {
   generatedAt: string;
 };
 
-export type MailchimpSectionMap = {
-  preheader?: string;
-  intro: string;
-  heroImage: string;
-  body: string;
-};
-
 export type MailchimpCampaignDraft = {
   id: string;
   webId?: number;
   title: string;
   status?: string;
   archiveUrl?: string;
+  checklist?: string[];
 };
 
 export type NewsletterPreferences = {

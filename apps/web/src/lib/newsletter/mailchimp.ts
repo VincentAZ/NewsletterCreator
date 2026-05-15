@@ -1,5 +1,5 @@
 import { loadLocalEnv } from "./env";
-import type { GeneratedImage, MailchimpCampaignDraft, MailchimpSectionMap, NewsletterDraft } from "./types";
+import type { GeneratedImage, MailchimpCampaignDraft, NewsletterDraft } from "./types";
 
 type MailchimpConfig = {
   apiKey: string;
@@ -18,18 +18,31 @@ type MailchimpCampaignResponse = {
   archive_url?: string;
 };
 
+type MailchimpChecklistResponse = {
+  items?: Array<{
+    type?: string;
+    heading?: string;
+    details?: string;
+    completed?: boolean;
+  }>;
+};
+
 export function isMailchimpConfigured() {
   loadLocalEnv();
-  return Boolean(process.env.MAILCHIMP_API_KEY && process.env.MAILCHIMP_LIST_ID);
+  return Boolean(
+    process.env.MAILCHIMP_API_KEY &&
+      process.env.MAILCHIMP_LIST_ID &&
+      process.env.MAILCHIMP_TEMPLATE_ID &&
+      process.env.MAILCHIMP_FROM_NAME &&
+      process.env.MAILCHIMP_REPLY_TO,
+  );
 }
 
 export async function createMailchimpCampaignDraft(input: {
   draft: NewsletterDraft;
   image: GeneratedImage;
-  templateId?: number;
-  sectionMap: MailchimpSectionMap;
 }): Promise<MailchimpCampaignDraft> {
-  const config = getMailchimpConfig(input.templateId);
+  const config = getMailchimpConfig();
   const title = `${input.draft.subject} - ${new Date().toISOString().slice(0, 10)}`;
 
   const campaign = await mailchimpFetch<MailchimpCampaignResponse>(config, "/campaigns", {
@@ -55,8 +68,9 @@ export async function createMailchimpCampaignDraft(input: {
 
   await mailchimpFetch(config, `/campaigns/${campaign.id}/content`, {
     method: "PUT",
-    body: JSON.stringify(buildCampaignContent(input.draft, input.image, config.templateId, input.sectionMap)),
+    body: JSON.stringify(buildCampaignContent(input.draft, input.image)),
   });
+  const checklist = await getCampaignChecklist(config, campaign.id);
 
   return {
     id: campaign.id,
@@ -64,15 +78,18 @@ export async function createMailchimpCampaignDraft(input: {
     title: campaign.settings?.title ?? title,
     status: campaign.status,
     archiveUrl: campaign.archive_url,
+    checklist,
   };
 }
 
-function getMailchimpConfig(templateId?: number): MailchimpConfig {
+function getMailchimpConfig(): MailchimpConfig {
   loadLocalEnv();
   const apiKey = process.env.MAILCHIMP_API_KEY;
   const listId = process.env.MAILCHIMP_LIST_ID;
   const server = process.env.MAILCHIMP_SERVER || apiKey?.split("-").at(-1);
   const configuredTemplateId = Number(process.env.MAILCHIMP_TEMPLATE_ID);
+  const fromName = process.env.MAILCHIMP_FROM_NAME?.trim();
+  const replyTo = process.env.MAILCHIMP_REPLY_TO?.trim();
 
   if (!apiKey) {
     throw new Error("MAILCHIMP_API_KEY is not configured.");
@@ -83,44 +100,44 @@ function getMailchimpConfig(templateId?: number): MailchimpConfig {
   if (!listId) {
     throw new Error("MAILCHIMP_LIST_ID is not configured.");
   }
+  if (!Number.isFinite(configuredTemplateId) || configuredTemplateId <= 0) {
+    throw new Error("MAILCHIMP_TEMPLATE_ID is not configured.");
+  }
+  if (!fromName) {
+    throw new Error("MAILCHIMP_FROM_NAME is not configured.");
+  }
+  if (!replyTo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) {
+    throw new Error("MAILCHIMP_REPLY_TO must be a real email address.");
+  }
 
   return {
     apiKey,
     server,
     listId,
-    templateId: templateId || (Number.isFinite(configuredTemplateId) && configuredTemplateId > 0 ? configuredTemplateId : undefined),
-    fromName: process.env.MAILCHIMP_FROM_NAME || "Newsletter Creator",
-    replyTo: process.env.MAILCHIMP_REPLY_TO || "newsletter@example.com",
+    templateId: configuredTemplateId,
+    fromName,
+    replyTo,
   };
 }
 
-function buildCampaignContent(
-  draft: NewsletterDraft,
-  image: GeneratedImage,
-  templateId: number | undefined,
-  sectionMap: MailchimpSectionMap,
-) {
-  const html = renderNewsletterHtml(draft, image);
-
-  if (!templateId) {
-    return {
-      html,
-      plain_text: renderNewsletterText(draft),
-    };
-  }
-
+function buildCampaignContent(draft: NewsletterDraft, image: GeneratedImage) {
   return {
-    template: {
-      id: templateId,
-      sections: {
-        [sectionMap.preheader || "preheader"]: escapeHtml(draft.preheader),
-        [sectionMap.intro]: renderIntroHtml(draft),
-        [sectionMap.heroImage]: renderHeroImageHtml(image, draft.subject),
-        [sectionMap.body]: renderSectionsHtml(draft),
-      },
-    },
+    html: renderNewsletterHtml(draft, image),
     plain_text: renderNewsletterText(draft),
   };
+}
+
+async function getCampaignChecklist(config: MailchimpConfig, campaignId: string) {
+  const checklist = await mailchimpFetch<MailchimpChecklistResponse>(config, `/campaigns/${campaignId}/send-checklist`, {
+    method: "GET",
+  }).catch(() => null);
+
+  return (
+    checklist?.items
+      ?.filter((item) => !item.completed)
+      .map((item) => [item.heading, item.details].filter(Boolean).join(": "))
+      .filter((item) => item.length > 0) ?? []
+  );
 }
 
 async function mailchimpFetch<T = unknown>(config: MailchimpConfig, path: string, init: RequestInit): Promise<T> {
