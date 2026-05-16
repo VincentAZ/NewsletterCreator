@@ -7,6 +7,17 @@ type MailchimpConfig = {
   listId: string;
   fromName: string;
   replyTo: string;
+  template?: MailchimpTemplateConfig;
+};
+
+type MailchimpTemplateConfig = {
+  id: number;
+  sections: {
+    preheader: string;
+    intro: string;
+    heroImage: string;
+    body: string;
+  };
 };
 
 type MailchimpCampaignResponse = {
@@ -66,7 +77,7 @@ export async function createMailchimpCampaignDraft(input: {
 
   await mailchimpFetch(config, `/campaigns/${campaign.id}/content`, {
     method: "PUT",
-    body: JSON.stringify(buildMailchimpCampaignContent(input.draft, input.image)),
+    body: JSON.stringify(buildMailchimpCampaignContent(input.draft, input.image, config.template)),
   });
   const checklist = await getCampaignChecklist(config, campaign.id);
 
@@ -87,6 +98,7 @@ function getMailchimpConfig(): MailchimpConfig {
   const server = process.env.MAILCHIMP_SERVER || apiKey?.split("-").at(-1);
   const fromName = process.env.MAILCHIMP_FROM_NAME?.trim();
   const replyTo = process.env.MAILCHIMP_REPLY_TO?.trim();
+  const templateId = parseMailchimpTemplateId(process.env.MAILCHIMP_TEMPLATE_ID);
 
   if (!apiKey) {
     throw new Error("MAILCHIMP_API_KEY is not configured.");
@@ -110,13 +122,67 @@ function getMailchimpConfig(): MailchimpConfig {
     listId,
     fromName,
     replyTo,
+    template: templateId
+      ? {
+          id: templateId,
+          sections: {
+            preheader: process.env.MAILCHIMP_SECTION_PREHEADER?.trim() || "preheader",
+            intro: process.env.MAILCHIMP_SECTION_INTRO?.trim() || "intro",
+            heroImage: process.env.MAILCHIMP_SECTION_HERO_IMAGE?.trim() || "hero_image",
+            body: process.env.MAILCHIMP_SECTION_BODY?.trim() || "body",
+          },
+        }
+      : undefined,
   };
 }
 
-export function buildMailchimpCampaignContent(draft: NewsletterDraft, image: GeneratedImage) {
+function parseMailchimpTemplateId(value: string | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const templateId = Number(trimmed);
+  if (!Number.isInteger(templateId) || templateId <= 0) {
+    throw new Error("MAILCHIMP_TEMPLATE_ID must be a positive numeric template id.");
+  }
+
+  return templateId;
+}
+
+export function buildMailchimpCampaignContent(
+  draft: NewsletterDraft,
+  image: GeneratedImage,
+  template?: MailchimpTemplateConfig,
+) {
+  const plainText = renderNewsletterText(draft);
+
+  if (template) {
+    return {
+      template: {
+        id: template.id,
+        sections: buildMailchimpTemplateSections(draft, image, template.sections),
+      },
+      plain_text: plainText,
+    };
+  }
+
   return {
     html: renderNewsletterHtml(draft, image),
-    plain_text: renderNewsletterText(draft),
+    plain_text: plainText,
+  };
+}
+
+function buildMailchimpTemplateSections(
+  draft: NewsletterDraft,
+  image: GeneratedImage,
+  sectionNames: MailchimpTemplateConfig["sections"],
+) {
+  return {
+    [sectionNames.preheader]: escapeHtml(draft.preheader),
+    [sectionNames.intro]: renderIntroHtml(draft),
+    [sectionNames.heroImage]: renderHeroImageHtml(image, draft.subject),
+    [sectionNames.body]: renderSectionsHtml(draft),
   };
 }
 

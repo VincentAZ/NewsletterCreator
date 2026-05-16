@@ -2,6 +2,32 @@
 
 ---
 
+# Restore Mailchimp Template Usage
+
+## Plan
+
+- [x] Confirm the current Mailchimp API flow and template payload shape.
+- [x] Reintroduce server-side `MAILCHIMP_TEMPLATE_ID` support while preserving the full-HTML fallback.
+- [x] Use configurable editable section names for Classic template `mc:edit` regions.
+- [x] Update README setup notes so the required restart and template constraints are clear.
+- [x] Run typecheck/build verification.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- `MAILCHIMP_TEMPLATE_ID` is now read server-side and, when present, campaign content is sent as a Mailchimp template payload.
+- Editable template sections default to `preheader`, `intro`, `hero_image`, and `body`, with `.env` overrides available for templates that use different `mc:edit` names.
+- If `MAILCHIMP_TEMPLATE_ID` is omitted, the previous full-HTML campaign content path remains in place.
+- README now documents template mode, section-name overrides, and the need to restart the Next dev server after `.env` changes.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
 # Generate Copy Prompt Trace
 
 ## Plan
