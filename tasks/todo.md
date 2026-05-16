@@ -28,6 +28,65 @@
 
 ---
 
+# Verify New Classic Mailchimp Template
+
+## Plan
+
+- [x] Read the updated `MAILCHIMP_TEMPLATE_ID` from `.env` and inspect Mailchimp template metadata.
+- [x] Run a temporary Mailchimp draft smoke test with the same template-section payload shape used by the app.
+- [x] Delete the temporary smoke draft after read-back.
+- [x] Relax validation so Classic HTML templates are accepted even when `default-content` does not list named sections.
+- [x] Run typecheck/build verification.
+
+## Verification
+
+- [x] Template `10032142` read as `content_type: html`.
+- [x] Smoke draft rendered non-empty HTML and contained the generated subject/body markers.
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Updated template `10032142` is Classic HTML (`content_type: html`).
+- Temporary smoke draft `16b73192c7` rendered HTML length 7041 and included generated subject/body markers, then was deleted.
+- Validation now accepts Classic HTML templates and relies on campaign content read-back to prove the generated newsletter rendered.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
+# Mailchimp Correct Template Compatibility
+
+## Plan
+
+- [x] Inspect configured Mailchimp template metadata and default-content sections.
+- [x] Test Mailchimp's documented template attach modes against the configured template.
+- [x] Stop silent fallback to the app-generated layout when `MAILCHIMP_TEMPLATE_ID` is set.
+- [x] Allow only API-compatible Classic templates with editable `mc:edit` sections.
+- [x] Update README and lessons with the template compatibility constraint.
+- [x] Run typecheck/build verification.
+
+## Verification
+
+- [x] Mailchimp template metadata inspected for `MAILCHIMP_TEMPLATE_ID`.
+- [x] Template attach smoke tests run for `content_type: template` and `content_type: multichannel`.
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Configured template `10032140` is named `Daily AI Brief` and has Mailchimp `content_type` of `multichannel`.
+- `/templates/10032140/default-content` returned no named editable sections.
+- Creating a test campaign with `content_type: template` plus `template_id: 10032140` returned `template_id` 10032140 but `html_length` 0.
+- Creating a test campaign with `content_type: multichannel` plus `template_id: 10032140` also returned `html_length` 0.
+- The app no longer silently falls back to the generated HTML layout when `MAILCHIMP_TEMPLATE_ID` is set.
+- Template mode now validates that the template is not multichannel/New Builder and exposes editable sections before creating a campaign.
+- If template mode is valid, the app attempts section population and fails if Mailchimp does not return rendered newsletter HTML.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
 # Mailchimp Preview Still Blank
 
 ## Plan

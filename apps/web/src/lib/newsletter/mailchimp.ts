@@ -7,6 +7,17 @@ type MailchimpConfig = {
   listId: string;
   fromName: string;
   replyTo: string;
+  template?: MailchimpTemplateConfig;
+};
+
+type MailchimpTemplateConfig = {
+  id: number;
+  sections: {
+    preheader: string;
+    intro: string;
+    heroImage: string;
+    body: string;
+  };
 };
 
 type MailchimpCampaignResponse = {
@@ -30,6 +41,12 @@ type MailchimpCampaignContentResponse = {
   html?: string;
 };
 
+type MailchimpTemplateResponse = {
+  id?: number;
+  name?: string;
+  content_type?: string;
+};
+
 export function isMailchimpConfigured() {
   loadLocalEnv();
   return Boolean(
@@ -45,6 +62,10 @@ export async function createMailchimpCampaignDraft(input: {
   image: GeneratedImage;
 }): Promise<MailchimpCampaignDraft> {
   const config = getMailchimpConfig();
+  if (config.template) {
+    await validateMailchimpTemplate(config, config.template.id);
+  }
+
   const title = `${input.draft.subject} - ${new Date().toISOString().slice(0, 10)}`;
 
   const campaign = await mailchimpFetch<MailchimpCampaignResponse>(config, "/campaigns", {
@@ -89,6 +110,7 @@ function getMailchimpConfig(): MailchimpConfig {
   const server = process.env.MAILCHIMP_SERVER || apiKey?.split("-").at(-1);
   const fromName = process.env.MAILCHIMP_FROM_NAME?.trim();
   const replyTo = process.env.MAILCHIMP_REPLY_TO?.trim();
+  const templateId = parseMailchimpTemplateId(process.env.MAILCHIMP_TEMPLATE_ID);
 
   if (!apiKey) {
     throw new Error("MAILCHIMP_API_KEY is not configured.");
@@ -112,14 +134,71 @@ function getMailchimpConfig(): MailchimpConfig {
     listId,
     fromName,
     replyTo,
+    template: templateId
+      ? {
+          id: templateId,
+          sections: {
+            preheader: process.env.MAILCHIMP_SECTION_PREHEADER?.trim() || "preheader",
+            intro: process.env.MAILCHIMP_SECTION_INTRO?.trim() || "intro",
+            heroImage: process.env.MAILCHIMP_SECTION_HERO_IMAGE?.trim() || "hero_image",
+            body: process.env.MAILCHIMP_SECTION_BODY?.trim() || "body",
+          },
+        }
+      : undefined,
   };
 }
 
-export function buildMailchimpCampaignContent(draft: NewsletterDraft, image: GeneratedImage) {
+function parseMailchimpTemplateId(value: string | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const templateId = Number(trimmed);
+  if (!Number.isInteger(templateId) || templateId <= 0) {
+    throw new Error("MAILCHIMP_TEMPLATE_ID must be a positive numeric template id.");
+  }
+
+  return templateId;
+}
+
+export function buildMailchimpCampaignContent(
+  draft: NewsletterDraft,
+  image: GeneratedImage,
+  template?: MailchimpTemplateConfig,
+) {
+  if (template) {
+    return {
+      template: {
+        id: template.id,
+        sections: buildMailchimpTemplateSections(draft, image, template.sections),
+      },
+      plain_text: renderNewsletterText(draft),
+    };
+  }
+
   return {
     html: renderNewsletterHtml(draft, image),
     plain_text: renderNewsletterText(draft),
   };
+}
+
+async function validateMailchimpTemplate(config: MailchimpConfig, templateId: number) {
+  const template = await mailchimpFetch<MailchimpTemplateResponse>(config, `/templates/${templateId}`, {
+    method: "GET",
+  });
+
+  if (template.content_type === "multichannel") {
+    throw new Error(
+      `MAILCHIMP_TEMPLATE_ID ${templateId} (${template.name ?? "unnamed template"}) is a multichannel/New Builder template. Mailchimp's Marketing API does not expose editable HTML sections for this template type, so the app cannot populate it without creating the wrong layout. Recreate it as a Classic coded template with mc:edit sections, or remove MAILCHIMP_TEMPLATE_ID to use the app's HTML layout.`,
+    );
+  }
+
+  if (template.content_type !== "html") {
+    throw new Error(
+      `MAILCHIMP_TEMPLATE_ID ${templateId} (${template.name ?? "unnamed template"}) has unsupported content_type "${template.content_type ?? "unknown"}". Use a Classic coded HTML template with mc:edit sections.`,
+    );
+  }
 }
 
 async function setCampaignContent(
@@ -128,6 +207,27 @@ async function setCampaignContent(
   draft: NewsletterDraft,
   image: GeneratedImage,
 ) {
+  if (config.template) {
+    await mailchimpFetch(config, `/campaigns/${campaignId}/content`, {
+      method: "PUT",
+      body: JSON.stringify(buildMailchimpCampaignContent(draft, image, config.template)),
+    });
+
+    const templateContent = await mailchimpFetch<MailchimpCampaignContentResponse>(
+      config,
+      `/campaigns/${campaignId}/content`,
+      { method: "GET" },
+    ).catch(() => null);
+
+    if (!templateContent?.html || !hasGeneratedNewsletterContent(templateContent.html, draft)) {
+      throw new Error(
+        `Mailchimp accepted MAILCHIMP_TEMPLATE_ID ${config.template.id}, but did not return previewable HTML with the generated newsletter content. This usually means the template is not a Classic template with matching mc:edit sections.`,
+      );
+    }
+
+    return;
+  }
+
   await mailchimpFetch(config, `/campaigns/${campaignId}/content`, {
     method: "PUT",
     body: JSON.stringify(buildMailchimpCampaignContent(draft, image)),
@@ -140,6 +240,19 @@ async function setCampaignContent(
   if (!content?.html || !hasGeneratedNewsletterContent(content.html, draft)) {
     throw new Error("Mailchimp saved the draft but did not return previewable HTML content. Open the draft in Mailchimp and check the template/content builder.");
   }
+}
+
+function buildMailchimpTemplateSections(
+  draft: NewsletterDraft,
+  image: GeneratedImage,
+  sectionNames: MailchimpTemplateConfig["sections"],
+) {
+  return {
+    [sectionNames.preheader]: escapeHtml(draft.preheader),
+    [sectionNames.intro]: renderIntroHtml(draft),
+    [sectionNames.heroImage]: renderHeroImageHtml(image, draft.subject),
+    [sectionNames.body]: renderSectionsHtml(draft),
+  };
 }
 
 function hasGeneratedNewsletterContent(html: string, draft: NewsletterDraft) {
