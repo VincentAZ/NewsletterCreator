@@ -1,3 +1,237 @@
+# Dev Server Missing Manifest Fix
+
+---
+
+# Generate Copy Prompt Trace
+
+## Plan
+
+- [x] Locate the dashboard `Generate copy` control and the `Copy system prompt` field.
+- [x] Trace the request payload sent when `Generate copy` is clicked.
+- [x] Trace the server-side draft generation prompt construction.
+- [x] Answer which prompt text is used and where in the workflow `Copy system prompt` applies.
+
+## Verification
+
+- [x] Confirm references from source code, not only the screenshot.
+
+## Review
+
+- `Copy system prompt` defaults to `Return valid JSON only.` and is sent as `systemPrompt` when `Generate copy` posts to `/api/newsletter/draft`.
+- The full generated copy task prompt is built separately by `buildNewsletterPrompt`, then sent as the OpenRouter user message.
+- The prompt applies to the Draft Review copy-generation workflow, including whole-newsletter generation and section regeneration.
+
+---
+
+# Prompt Library And Visibility
+
+## Plan
+
+- [x] Inventory every prompt path in the app and centralize default prompt text.
+- [x] Add database-backed saved prompt profiles plus last-used prompt tracking.
+- [x] Expose/edit all workflow prompt templates in the UI, including the hidden draft task prompt.
+- [x] Add save/select controls in the Draft Review card and apply selected prompt profiles across the workflow.
+- [x] Send the edited draft task prompt to the draft API and use it server-side.
+- [x] Update schema/docs and run typecheck/build verification.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+- [x] Rendered dashboard smoke check for prompt controls
+
+## Review
+
+- Centralized default workflow prompts in `apps/web/src/lib/newsletter/prompts.ts`.
+- Added editable prompt profiles covering AI scrape system prompt, AI scrape task prompt, copy system prompt, copy task prompt, image system prompt, and image task prompt.
+- Added `prompt_sets` and `last_prompt_set_id` persistence through the preferences API and Supabase schema.
+- Draft Review now includes a saved prompt dropdown, prompt name input, save prompt button, and new prompt button.
+- The articles API now sends the edited scrape task prompt to OpenRouter for website/fallback article selection.
+- The draft API now sends the edited copy task prompt to OpenRouter for whole-newsletter and section regeneration.
+- README schema/docs were updated for saved prompt persistence.
+- `npm run typecheck` passed.
+- `npm run build` initially hit the known generated `.next` Windows `EPERM`; after stopping repo Next dev processes and removing generated `.next`, the build passed.
+- `npm run db:ensure-schema` could not apply the schema because the derived Supabase database hostname did not resolve from this machine.
+- Rendered dashboard smoke check at `http://127.0.0.1:3000/` confirmed `Saved prompts`, `Prompt name`, `Save prompt`, `Copy system prompt`, `Copy task prompt`, `AI scrape system prompt`, `AI scrape task prompt`, `Image system prompt`, and `Image task prompt` are present.
+- Browser plugin verification was not available because the required Node REPL control tool was not exposed after tool discovery, so verification used HTTP-rendered HTML instead.
+- Stopped the Codex-started dev server after verification.
+
+---
+
+# Release Codex Dev Server
+
+## Plan
+
+- [x] Identify the Codex-started dev server blocking the user's `npm run dev`.
+- [x] Stop the Codex-started Next dev process tree.
+- [x] Verify no repo Next dev processes remain.
+- [x] Capture the lesson so future checks do not leave the user's port occupied.
+
+## Verification
+
+- [x] No `node.exe`/`cmd.exe` process remains with a `NewsletterCreator` dev-server command line.
+
+## Review
+
+- Stopped PID `41552` and its parent dev runner PID `20968`.
+- Port ownership is now released for the user's terminal-run `npm run dev`.
+- Added a lesson to stop Codex-owned dev servers after verification unless the user explicitly wants them kept alive.
+
+---
+
+# Duplicate Dev Server Cleanup
+
+## Plan
+
+- [x] Confirm the reported PID belongs to this repo's Next dev server.
+- [x] Stop the duplicate/stale Next dev processes for `apps/web`.
+- [x] Restart one dev server and verify the dashboard responds.
+- [x] Document the result.
+
+## Verification
+
+- [x] `npm run dev` starts without the duplicate-server error
+- [x] Local dashboard HTTP smoke check
+
+## Review
+
+- Stopped the stale duplicate Next dev processes that were holding `apps/web`.
+- Restarted one dev server from the repo root.
+- The app is serving at `http://localhost:3000`.
+- `GET /` returned `200` and rendered the dashboard shell.
+- `GET /api/newsletter/preferences?preferenceId=default-preferences` returned `200`.
+- `dev-server.codex.err.log` is currently empty.
+
+## Plan
+
+- [x] Stop duplicate Next dev processes that are sharing the same generated `.next/dev` cache.
+- [x] Clear generated `.next` output only after the repo dev processes are stopped.
+- [x] Restart a single clean dev server and verify preferences/models API routes return non-500 responses.
+- [x] Harden `Load models` error handling so route failures surface in UI status without an unhandled rejection.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] Preferences API smoke check
+- [x] Models API smoke check
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Stopped duplicate Next dev/build processes for this repo that were sharing generated `.next/dev` state.
+- Cleared generated `.next` output only after those processes were stopped.
+- Restarted one clean dev server on `http://127.0.0.1:3002`.
+- Verified `/api/newsletter/preferences?preferenceId=default-preferences` returns `200`.
+- Verified `/api/newsletter/models` returns `200`.
+- Wrapped `loadModels` in `try`/`catch`/`finally` so API failures update dashboard status and clear busy state instead of becoming an unhandled rejection.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
+# AI Scrape Model Closed Selector Fix
+
+## Plan
+
+- [x] Confirm why the Source Queue AI scrape model control can appear blank and open.
+- [x] Replace the always-open scrape model list with a closed, bounded selector that preserves the selected model.
+- [x] Keep search filtering and capability display intact without implicitly changing saved model selections.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Replaced the always-open Source Queue scrape model listbox with a closed native select.
+- The selected scrape model is now kept as an option when the current search filter does not include it, preventing a blank selected control.
+- Removed unused listbox/button styles for the old scrape picker.
+- `npm run typecheck` passed.
+- `npm run build` initially hit the recurring generated `.next` Windows `EPERM`; clearing generated `.next` output allowed the build to pass.
+- Local HTTP smoke check at `http://127.0.0.1:3002` returned `200`, rendered `AI scrape model`, and no longer rendered the old `modelOptionList` listbox markup.
+
+---
+
+# Load Models Scrape Preference Reload
+
+## Plan
+
+- [x] Review the existing scrape model preference schema/API and dashboard load flow.
+- [x] Make `Load models` refresh saved preferences and apply the stored AI scrape model after model catalogs load.
+- [x] Keep automatic preference saving from overwriting the stored scrape model during the load race.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- `Load models` now fetches the active preference row alongside the model catalogs.
+- If the database row has `scrapeModel`, the dashboard applies that saved AI scrape model after models load instead of falling back to the first/default model.
+- If the preference fetch fails or Supabase is not configured, the existing fallback behavior remains unchanged.
+- `npm run typecheck` passed.
+- `npm run build` initially hit the recurring generated `.next` Windows `EPERM`; clearing generated `.next` output allowed the build to pass.
+
+---
+
+# Source Queue Scrape Picker Overflow Fix
+
+## Plan
+
+- [x] Confirm the Source Queue scrape model picker overflow behavior and the current related worktree changes.
+- [x] Replace the narrow Source Queue native scrape-model dropdown with an in-pane constrained model picker.
+- [x] Add focused styles so long model names/IDs wrap or truncate inside the Source Queue pane without affecting the top Models card.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Replaced the Source Queue scrape model native dropdown with a bounded in-pane option list, avoiding the browser popup that could overlap Draft Review.
+- Added Source Queue-safe sizing, overflow, and selected-option styles for long OpenRouter model names and IDs.
+- `npm run typecheck` passed.
+- `npm run build` initially hit the known generated `.next` Windows `EPERM`; clearing generated `.next` output allowed the build to pass.
+- Local HTTP smoke check at `http://127.0.0.1:3000` returned `200` and rendered the dashboard plus `modelOptionList`.
+
+---
+
+# Source Scrape Model Persistence And Layout Fix
+
+## Plan
+
+- [x] Confirm the current dashboard, preferences API, and schema handling for the AI scrape/source model.
+- [x] Fix the Source Queue model picker layout so long model controls stay inside the pane and do not resize/jump.
+- [x] Stop scrape model search from implicitly changing and saving the selected model while typing.
+- [x] Align README schema/persistence docs with the actual `scrape_model` database column.
+- [x] Improve preference save errors enough to expose missing-column/schema issues.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Fixed Source Queue model controls so long model names and capability text stay inside the source pane.
+- Search fields now filter model dropdown options without implicitly changing and saving the selected copy, scrape, or image model.
+- Confirmed the live database was missing `newsletter_preferences.scrape_model`; added the column and reloaded the Supabase/PostgREST schema cache.
+- Verified the default preference row now saves and reloads `scrapeModel` as `openai/gpt-4.1-mini`.
+- Updated `npm run db:ensure-schema` to fall back to `npx supabase db query` when `psql` is not installed.
+- Updated README schema/persistence docs to include the AI scrape/source model.
+- `npm run typecheck` passed.
+- `npm run build` passed after clearing the known generated `.next` Windows `EPERM` lock.
+
+---
+
 # Mailchimp Template ID Commit
 
 ## Plan

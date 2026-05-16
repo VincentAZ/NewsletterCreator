@@ -13,6 +13,9 @@
 - After fixing a deployment failure locally, compare the failed deploy commit with local `HEAD` and the remote branch before declaring the fix ready; Vercel only sees pushed commits from the connected repository.
 - For NewsletterCreator website sources, do not describe or implement scraping as plain regex/link extraction when the user expects AI scraping. Website source extraction should use an AI model to identify article candidates from fetched page content.
 - When adding any AI-powered workflow in NewsletterCreator, expose both the system prompt and model selection in the relevant app section instead of hiding them in server code or env-only settings.
+- For NewsletterCreator prompt work, do not expose only the chat system prompt. Any hidden user/task prompt template must also be visible, editable, and tied to persistence when the user asks for saved prompts.
 - Do not make model-dependent dropdowns appear like single-option controls before the model catalog is loaded. Auto-load or clearly populate OpenRouter model choices for any model selector added to the app.
 - If Gather news depends on the AI scrape model, disable the Gather news button until `Load models` has populated the model catalog and a scrape model is selected.
 - For Vercel team deploys, align git author email with a Vercel team member email before pushing, instead of relying on GitHub org OAuth labels to satisfy commit-author verification.
+- Before clearing generated `.next` output on Windows, stop all Next dev/build processes for this repo. A live dev server can leave `.next/dev` metadata partially deleted and cause missing `app-paths-manifest.json` 500s.
+- When the user is running `npm run dev` in their own terminal, do not leave a Codex-started background Next dev server running on the same repo/port. Stop Codex-owned dev servers after verification unless the user explicitly wants it kept alive.

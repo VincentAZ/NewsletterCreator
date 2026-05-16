@@ -223,6 +223,26 @@ textarea {
   min-width: 0;
 }
 
+.modelControl input,
+.modelControl select {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.modelOptionField {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.modelOptionLabel {
+  color: #44505a;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
 .toolbarActions {
   align-content: start;
   display: grid;
@@ -353,6 +373,7 @@ textarea {
   border: 1px solid #d9e0e5;
   border-radius: 8px;
   min-height: 690px;
+  min-width: 0;
   padding: 1rem;
 }
 
@@ -420,12 +441,19 @@ textarea {
   display: grid;
   gap: 0.6rem;
   margin-top: 0.85rem;
+  min-width: 0;
+  overflow: hidden;
   padding: 0.75rem;
 }
 
 .scrapeSettings.loaded {
   background: #e8edf0;
   border-color: #d4dde3;
+}
+
+.scrapeSettings .modelCapabilities {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .sourceManager,
@@ -923,6 +951,35 @@ button.helpButton:focus-visible {
   min-height: 6.5rem;
 }
 
+.fieldBlock textarea.systemPromptInput.large {
+  min-height: 12rem;
+}
+
+.promptLibrary {
+  border: 1px solid #dce3e8;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  padding: 0.85rem;
+}
+
+.promptLibrary label {
+  min-width: 0;
+}
+
+.promptLibrary input,
+.promptLibrary select {
+  width: 100%;
+}
+
+.promptLibraryActions {
+  display: grid;
+  gap: 0.55rem;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .sectionStack {
   display: grid;
   gap: 0.9rem;
@@ -1068,6 +1125,11 @@ button.helpButton:focus-visible {
   }
 
   .sectionControls {
+    grid-template-columns: 1fr;
+  }
+
+  .promptLibrary,
+  .promptLibraryActions {
     grid-template-columns: 1fr;
   }
 

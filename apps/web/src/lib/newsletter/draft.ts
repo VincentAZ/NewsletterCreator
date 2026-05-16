@@ -1,9 +1,11 @@
 import type { Article, NewsletterDraft, ValidationResult } from "./types";
+import { defaultCopyTaskPrompt } from "./prompts";
 
 export function buildNewsletterPrompt(input: {
   articles: Article[];
   feedback?: string;
   previousDraft?: NewsletterDraft;
+  taskPrompt?: string;
   target?: string;
 }) {
   const articles = input.articles
@@ -19,13 +21,18 @@ Summary: ${article.summary || "No summary provided."}`;
   const previousDraft = input.previousDraft ? `\nPrevious draft JSON:\n${JSON.stringify(input.previousDraft)}` : "";
   const feedback = input.feedback ? `\nEditor feedback:\n${input.feedback}` : "";
   const target = input.target ? `\nRegeneration target:\n${input.target}` : "";
+  const previousDraftJson = input.previousDraft ? JSON.stringify(input.previousDraft) : "";
+  const template = input.taskPrompt?.trim() || defaultCopyTaskPrompt;
+  const rendered = template
+    .replaceAll("{{targetBlock}}", target)
+    .replaceAll("{{feedbackBlock}}", feedback)
+    .replaceAll("{{previousDraftBlock}}", previousDraft)
+    .replaceAll("{{target}}", input.target ?? "")
+    .replaceAll("{{feedback}}", input.feedback ?? "")
+    .replaceAll("{{previousDraftJson}}", previousDraftJson)
+    .replaceAll("{{articles}}", articles);
 
-  return `Create a concise daily AI-news newsletter from these articles. Return strict JSON only.
-Shape: {"subject":"string","preheader":"string","intro":"string","sections":[{"id":"short-kebab-case","heading":"string","summary":"string","items":[{"title":"string","url":"string","source":"string","summary":"string","whyItMatters":"string"}]}],"imagePrompt":"string","confidenceScore":0,"editorialNotes":["string"]}.
-Rules: use 3-5 sections, use only provided stories, keep a sharp factual tone, make imagePrompt a no-text/no-logo editorial hero image prompt, confidenceScore is 1-10.${target}${feedback}${previousDraft}
-
-Articles:
-${articles}`;
+  return rendered.includes(articles) ? rendered : `${rendered}\n\nArticles:\n${articles}`;
 }
 
 export function validateNewsletterDraft(value: unknown): ValidationResult {

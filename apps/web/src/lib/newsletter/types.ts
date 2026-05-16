@@ -78,6 +78,18 @@ export type GeneratedImage = {
   generatedAt: string;
 };
 
+export type PromptSet = {
+  id: string;
+  name: string;
+  scrapeSystemPrompt: string;
+  scrapeTaskPrompt: string;
+  copySystemPrompt: string;
+  copyTaskPrompt: string;
+  imageSystemPrompt: string;
+  imageTaskPrompt: string;
+  updatedAt: string;
+};
+
 export type MailchimpCampaignDraft = {
   id: string;
   webId?: number;
@@ -93,6 +105,8 @@ export type NewsletterPreferences = {
   copyModel: string;
   scrapeModel: string;
   imageModel: string;
+  promptSets: PromptSet[];
+  lastPromptSetId: string;
   updatedAt: string;
 };
 

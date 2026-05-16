@@ -6,6 +6,7 @@ loadLocalEnv();
 
 const scriptPath = resolve("scripts", "ensure-supabase-schema.sql");
 const databaseUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || buildSupabaseDatabaseUrl();
+const schemaSql = existsSync(scriptPath) ? readFileSync(scriptPath, "utf8") : "";
 
 if (!existsSync(scriptPath)) {
   console.error(`Schema file not found: ${scriptPath}`);
@@ -24,21 +25,76 @@ if (!databaseUrl) {
   console.error("  npm run db:ensure-schema");
   console.error("");
   console.error("SQL to apply:");
-  console.error(readFileSync(scriptPath, "utf8"));
+  console.error(schemaSql);
   process.exit(1);
 }
 
-const result = spawnSync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-f", scriptPath], {
-  stdio: "inherit",
-  shell: process.platform === "win32",
-});
+if (commandExists("psql")) {
+  const result = spawnSync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-f", scriptPath], {
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
 
-if (result.error) {
-  console.error(result.error.message);
+  if (result.error) {
+    console.error(result.error.message);
+    process.exit(1);
+  }
+
+  process.exit(result.status ?? 1);
+}
+
+console.log("psql was not found. Falling back to Supabase CLI via npx.");
+for (const statement of splitSqlStatements(schemaSql)) {
+  const result = runSupabaseQuery(databaseUrl, statement);
+
+  if (result.error) {
+    console.error(result.error.message);
+    process.exit(1);
+  }
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
+const reloadResult = runSupabaseQuery(databaseUrl, "notify pgrst, 'reload schema'");
+
+if (reloadResult.error) {
+  console.error(reloadResult.error.message);
   process.exit(1);
 }
 
-process.exit(result.status ?? 1);
+process.exit(reloadResult.status ?? 1);
+
+function commandExists(command) {
+  const checker = process.platform === "win32" ? "where" : "command";
+  const args = process.platform === "win32" ? [command] : ["-v", command];
+  const result = spawnSync(checker, args, { stdio: "ignore", shell: process.platform !== "win32" });
+  return result.status === 0;
+}
+
+function runSupabaseQuery(dbUrl, statement) {
+  return spawnSync(
+    `npx supabase db query --db-url ${shellQuote(dbUrl)} ${shellQuote(statement)}`,
+    {
+      stdio: "inherit",
+      shell: true,
+    },
+  );
+}
+
+function shellQuote(value) {
+  if (process.platform === "win32") {
+    return `"${String(value).replace(/"/g, '\\"')}"`;
+  }
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
+function splitSqlStatements(sql) {
+  return sql
+    .split(";")
+    .map((statement) => statement.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+}
 
 function buildSupabaseDatabaseUrl() {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";

@@ -10,10 +10,20 @@ import type {
   NewsletterPreferences,
   NewsletterDraft,
   NewsletterSection,
+  PromptSet,
   ProviderBalance,
   ProviderModel,
   ValidationResult,
 } from "@/lib/newsletter/types";
+import {
+  createDefaultPromptSet,
+  defaultCopySystemPrompt,
+  defaultCopyTaskPrompt,
+  defaultImageTaskPrompt,
+  defaultImageSystemPrompt,
+  defaultScrapeSystemPrompt,
+  defaultScrapeTaskPrompt,
+} from "@/lib/newsletter/prompts";
 
 type ModelsPayload = {
   openRouterModels: ProviderModel[];
@@ -58,12 +68,7 @@ type MailchimpPayload = {
 
 const preferenceIdKey = "newsletterCreator.preferenceId.v1";
 const defaultPreferenceId = "default-preferences";
-const defaultCopySystemPrompt = "Return valid JSON only.";
 const defaultScrapeModel = "openai/gpt-4.1-mini";
-const defaultScrapeSystemPrompt =
-  "You extract article candidates from source-page link context for an AI newsletter. Return valid JSON only.";
-const defaultImageSystemPrompt =
-  "Create an editorial newsletter hero image. Avoid text, logos, watermarks, UI chrome, brand marks, and distorted typography.";
 
 const emptyBalances: Balances = {
   openRouter: {
@@ -149,9 +154,15 @@ export function NewsletterDashboard() {
   const [balances, setBalances] = useState<Balances>(emptyBalances);
   const [globalFeedback, setGlobalFeedback] = useState("");
   const [scrapeSystemPrompt, setScrapeSystemPrompt] = useState(defaultScrapeSystemPrompt);
+  const [scrapeTaskPrompt, setScrapeTaskPrompt] = useState(defaultScrapeTaskPrompt);
   const [imageFeedback, setImageFeedback] = useState("");
   const [copySystemPrompt, setCopySystemPrompt] = useState(defaultCopySystemPrompt);
+  const [copyTaskPrompt, setCopyTaskPrompt] = useState(defaultCopyTaskPrompt);
   const [imageSystemPrompt, setImageSystemPrompt] = useState(defaultImageSystemPrompt);
+  const [imageTaskPrompt, setImageTaskPrompt] = useState(defaultImageTaskPrompt);
+  const [promptSets, setPromptSets] = useState<PromptSet[]>([]);
+  const [selectedPromptSetId, setSelectedPromptSetId] = useState("");
+  const [promptSetName, setPromptSetName] = useState("Default workflow prompts");
   const [mailchimpCampaign, setMailchimpCampaign] = useState<MailchimpCampaignDraft | null>(null);
   const [status, setStatus] = useState("Load models and sources to start.");
   const [isBusy, setIsBusy] = useState(false);
@@ -241,12 +252,29 @@ export function NewsletterDashboard() {
       if (preferences?.imageModel) {
         setImageModel(preferences.imageModel);
       }
+      const savedPromptSets = normalizeDashboardPromptSets(preferences?.promptSets ?? []);
+      const lastPromptSet = findPromptSet(savedPromptSets, preferences?.lastPromptSetId) ?? savedPromptSets[0] ?? null;
+      setPromptSets(savedPromptSets);
+      if (lastPromptSet) {
+        applyPromptSetState(lastPromptSet, {
+          setSelectedPromptSetId,
+          setPromptSetName,
+          setScrapeSystemPrompt,
+          setScrapeTaskPrompt,
+          setCopySystemPrompt,
+          setCopyTaskPrompt,
+          setImageSystemPrompt,
+          setImageTaskPrompt,
+        });
+      }
       lastSavedPreferences.current = preferences && !shouldMigrateLegacyPreferences
         ? serializePreferences({
             sources: preferences.sources.length ? preferences.sources : defaultNewsSources,
             copyModel: preferences.copyModel ?? "",
             scrapeModel: preferences.scrapeModel ?? "",
             imageModel: preferences.imageModel ?? "",
+            promptSets: savedPromptSets,
+            lastPromptSetId: lastPromptSet?.id ?? preferences.lastPromptSetId ?? "",
           })
         : "";
 
@@ -284,6 +312,8 @@ export function NewsletterDashboard() {
       copyModel,
       scrapeModel,
       imageModel,
+      promptSets,
+      lastPromptSetId: selectedPromptSetId,
     };
     const serialized = serializePreferences(preferences);
     if (serialized === lastSavedPreferences.current) {
@@ -312,47 +342,41 @@ export function NewsletterDashboard() {
     }, 600);
 
     return () => window.clearTimeout(timeout);
-  }, [copyModel, imageModel, preferenceId, preferencesLoaded, scrapeModel, sources]);
-
-  useEffect(() => {
-    if (!copyModelSearch.trim() || filteredOpenRouterModels.length === 0) {
-      return;
-    }
-    if (!filteredOpenRouterModels.some((model) => model.id === copyModel)) {
-      setCopyModel(filteredOpenRouterModels[0].id);
-    }
-  }, [copyModel, copyModelSearch, filteredOpenRouterModels]);
-
-  useEffect(() => {
-    if (!scrapeModelSearch.trim() || filteredScrapeModels.length === 0) {
-      return;
-    }
-    if (!filteredScrapeModels.some((model) => model.id === scrapeModel)) {
-      setScrapeModel(filteredScrapeModels[0].id);
-    }
-  }, [filteredScrapeModels, scrapeModel, scrapeModelSearch]);
-
-  useEffect(() => {
-    if (!imageModelSearch.trim() || filteredFalModels.length === 0) {
-      return;
-    }
-    if (!filteredFalModels.some((model) => model.id === imageModel)) {
-      setImageModel(filteredFalModels[0].id);
-    }
-  }, [filteredFalModels, imageModel, imageModelSearch]);
+  }, [copyModel, imageModel, preferenceId, preferencesLoaded, promptSets, scrapeModel, selectedPromptSetId, sources]);
 
   async function loadModels() {
     setIsBusy(true);
     setStatus("Fetching OpenRouter and fal.ai model catalogs.");
-    const payload = await fetchJson<ModelsPayload>("/api/newsletter/models");
-    setOpenRouterModels(payload.openRouterModels);
-    setFalModels(payload.falModels);
-    setCopyModel((current) => current || payload.openRouterModels[0]?.id || "");
-    setScrapeModel((current) => current || payload.openRouterModels[0]?.id || defaultScrapeModel);
-    setImageModel((current) => current || payload.falModels[0]?.id || "");
-    setBalances(payload.balances);
-    setStatus("Models are ready. Change the selections if you want, then click Gather news.");
-    setIsBusy(false);
+    try {
+      const id = preferenceId || getPreferenceIdentity().preferenceId;
+      if (!preferenceId) {
+        setPreferenceId(id);
+      }
+
+      const [payload, preferencesPayload] = await Promise.all([
+        fetchJson<ModelsPayload>("/api/newsletter/models"),
+        fetchJson<PreferencesPayload>(`/api/newsletter/preferences?preferenceId=${encodeURIComponent(id)}`).catch(
+          () => null,
+        ),
+      ]);
+      const savedScrapeModel = preferencesPayload?.configured ? preferencesPayload.preferences?.scrapeModel.trim() : "";
+
+      setOpenRouterModels(payload.openRouterModels);
+      setFalModels(payload.falModels);
+      setCopyModel((current) => current || payload.openRouterModels[0]?.id || "");
+      setScrapeModel((current) => savedScrapeModel || current || payload.openRouterModels[0]?.id || defaultScrapeModel);
+      setImageModel((current) => current || payload.falModels[0]?.id || "");
+      setBalances(payload.balances);
+      setStatus(
+        savedScrapeModel
+          ? "Models are ready. Loaded your saved AI scrape model preference."
+          : "Models are ready. Change the selections if you want, then click Gather news.",
+      );
+    } catch (error) {
+      setStatus(error instanceof Error ? `Model loading failed: ${error.message}` : "Model loading failed.");
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   async function loadArticles() {
@@ -367,6 +391,7 @@ export function NewsletterDashboard() {
       sources,
       scrapeModel,
       scrapeSystemPrompt,
+      scrapeTaskPrompt,
     });
     setArticles(payload.articles);
     setSelectedArticleIds(new Set(payload.articles.slice(0, 30).map((article) => article.id)));
@@ -392,6 +417,7 @@ export function NewsletterDashboard() {
       feedback: target ? sectionFeedback(target) || globalFeedback : globalFeedback,
       previousDraft: draft,
       systemPrompt: copySystemPrompt,
+      taskPrompt: copyTaskPrompt,
       target,
     });
 
@@ -423,6 +449,7 @@ export function NewsletterDashboard() {
         prompt: draft.imagePrompt,
         feedback: imageFeedback,
         systemPrompt: imageSystemPrompt,
+        taskPrompt: imageTaskPrompt,
       });
 
       if (payload.image) {
@@ -590,6 +617,109 @@ export function NewsletterDashboard() {
     return section?.feedback ?? "";
   }
 
+  async function savePromptSet() {
+    const promptSet = buildCurrentPromptSet({
+      id: selectedPromptSetId || crypto.randomUUID(),
+      name: promptSetName,
+      scrapeSystemPrompt,
+      scrapeTaskPrompt,
+      copySystemPrompt,
+      copyTaskPrompt,
+      imageSystemPrompt,
+      imageTaskPrompt,
+    });
+    const nextPromptSets = upsertPromptSet(promptSets, promptSet);
+
+    setPromptSets(nextPromptSets);
+    setSelectedPromptSetId(promptSet.id);
+    setPromptSetName(promptSet.name);
+    setStatus("Saving prompt set.");
+
+    try {
+      await persistPreferencesNow({
+        promptSets: nextPromptSets,
+        lastPromptSetId: promptSet.id,
+      });
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Prompt set save failed.");
+    }
+  }
+
+  function newPromptSet() {
+    const promptSet = createDefaultPromptSet();
+    setSelectedPromptSetId("");
+    setPromptSetName(promptSet.name);
+    setScrapeSystemPrompt(promptSet.scrapeSystemPrompt);
+    setScrapeTaskPrompt(promptSet.scrapeTaskPrompt);
+    setCopySystemPrompt(promptSet.copySystemPrompt);
+    setCopyTaskPrompt(promptSet.copyTaskPrompt);
+    setImageSystemPrompt(promptSet.imageSystemPrompt);
+    setImageTaskPrompt(promptSet.imageTaskPrompt);
+    setStatus("Started a new unsaved prompt set.");
+  }
+
+  function selectPromptSet(promptSetId: string) {
+    const promptSet = findPromptSet(promptSets, promptSetId);
+    if (!promptSet) {
+      setSelectedPromptSetId("");
+      return;
+    }
+
+    applyPromptSetState(promptSet, {
+      setSelectedPromptSetId,
+      setPromptSetName,
+      setScrapeSystemPrompt,
+      setScrapeTaskPrompt,
+      setCopySystemPrompt,
+      setCopyTaskPrompt,
+      setImageSystemPrompt,
+      setImageTaskPrompt,
+    });
+    setStatus(`Loaded prompt set: ${promptSet.name}.`);
+    void persistPreferencesNow({ lastPromptSetId: promptSet.id }).catch((error) => {
+      setStatus(error instanceof Error ? error.message : "Last used prompt save failed.");
+    });
+  }
+
+  async function persistPreferencesNow(overrides: Partial<{
+    sources: NewsSource[];
+    copyModel: string;
+    scrapeModel: string;
+    imageModel: string;
+    promptSets: PromptSet[];
+    lastPromptSetId: string;
+  }>) {
+    const id = preferenceId || getPreferenceIdentity().preferenceId;
+    if (!preferenceId) {
+      setPreferenceId(id);
+    }
+    const preferences = {
+      sources,
+      copyModel,
+      scrapeModel,
+      imageModel,
+      promptSets,
+      lastPromptSetId: selectedPromptSetId,
+      ...overrides,
+    };
+    const payload = await putJson<PreferencesPayload>("/api/newsletter/preferences", {
+      preferenceId: id,
+      ...preferences,
+    });
+
+    if (!payload.configured) {
+      setStatus("Supabase is required to save prompts. Add Supabase env vars and run the schema script.");
+      return;
+    }
+    if (payload.error) {
+      setStatus(payload.error);
+      return;
+    }
+
+    lastSavedPreferences.current = serializePreferences(preferences);
+    setStatus("Prompt set saved.");
+  }
+
   return (
     <div className="newsletterApp">
       <header className="appHeader">
@@ -623,6 +753,9 @@ export function NewsletterDashboard() {
           <label>
             Copy model
             <select value={copyModel} onChange={(event) => setCopyModel(event.target.value)}>
+              {copyModel && !filteredOpenRouterModels.some((model) => model.id === copyModel) ? (
+                <option value={copyModel}>{selectedCopyModel?.name ?? copyModel}</option>
+              ) : null}
               {filteredOpenRouterModels.map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.name}
@@ -644,6 +777,9 @@ export function NewsletterDashboard() {
           <label>
             Image model
             <select value={imageModel} onChange={(event) => setImageModel(event.target.value)}>
+              {imageModel && !filteredFalModels.some((model) => model.id === imageModel) ? (
+                <option value={imageModel}>{selectedImageModel?.name ?? imageModel}</option>
+              ) : null}
               {filteredFalModels.map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.name}
@@ -699,24 +835,21 @@ export function NewsletterDashboard() {
                   disabled={openRouterModels.length === 0}
                 />
               </label>
-              <label>
-                AI scrape model
-                <select
-                  value={openRouterModels.length > 0 ? scrapeModel : ""}
-                  onChange={(event) => setScrapeModel(event.target.value)}
+              <div className="modelOptionField">
+                <span className="modelOptionLabel">AI scrape model</span>
+                <ModelSelect
+                  models={filteredScrapeModels}
+                  selectedId={openRouterModels.length > 0 ? scrapeModel : ""}
+                  onSelect={setScrapeModel}
                   disabled={openRouterModels.length === 0}
-                >
-                  {openRouterModels.length === 0 ? <option value="">Load models first</option> : null}
-                  {openRouterModels.length > 0 && !openRouterModels.some((model) => model.id === scrapeModel) ? (
-                    <option value={scrapeModel}>{scrapeModel}</option>
-                  ) : null}
-                  {filteredScrapeModels.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  selectedModel={selectedScrapeModel}
+                  emptyLabel={
+                    openRouterModels.length === 0
+                      ? "Load models first"
+                      : "No scrape models match this search."
+                  }
+                />
+              </div>
               <ModelCapabilities model={selectedScrapeModel} emptyLabel="Load models to inspect scrape capabilities." />
               <span className="fieldHint">
                 {openRouterModels.length > 0
@@ -731,6 +864,15 @@ export function NewsletterDashboard() {
                 value={scrapeSystemPrompt}
                 onChange={(event) => setScrapeSystemPrompt(event.target.value)}
                 placeholder={defaultScrapeSystemPrompt}
+              />
+            </label>
+            <label className="fieldBlock compact">
+              AI scrape task prompt
+              <textarea
+                className="systemPromptInput large"
+                value={scrapeTaskPrompt}
+                onChange={(event) => setScrapeTaskPrompt(event.target.value)}
+                placeholder={defaultScrapeTaskPrompt}
               />
             </label>
           </div>
@@ -1005,6 +1147,32 @@ export function NewsletterDashboard() {
             </button>
           </div>
 
+          <div className="promptLibrary">
+            <label>
+              Saved prompts
+              <select value={selectedPromptSetId} onChange={(event) => selectPromptSet(event.target.value)}>
+                <option value="">{promptSets.length > 0 ? "Unsaved prompt set" : "No saved prompt sets"}</option>
+                {promptSets.map((promptSet) => (
+                  <option key={promptSet.id} value={promptSet.id}>
+                    {promptSet.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Prompt name
+              <input value={promptSetName} onChange={(event) => setPromptSetName(event.target.value)} />
+            </label>
+            <div className="promptLibraryActions">
+              <button type="button" onClick={() => void savePromptSet()} disabled={isBusy}>
+                Save prompt
+              </button>
+              <button type="button" className="ghost" onClick={newPromptSet} disabled={isBusy}>
+                New prompt
+              </button>
+            </div>
+          </div>
+
           <label className="fieldBlock">
             Copy system prompt
             <textarea
@@ -1012,6 +1180,16 @@ export function NewsletterDashboard() {
               value={copySystemPrompt}
               onChange={(event) => setCopySystemPrompt(event.target.value)}
               placeholder={defaultCopySystemPrompt}
+            />
+          </label>
+
+          <label className="fieldBlock">
+            Copy task prompt
+            <textarea
+              className="systemPromptInput large"
+              value={copyTaskPrompt}
+              onChange={(event) => setCopyTaskPrompt(event.target.value)}
+              placeholder={defaultCopyTaskPrompt}
             />
           </label>
 
@@ -1108,6 +1286,16 @@ export function NewsletterDashboard() {
               value={imageSystemPrompt}
               onChange={(event) => setImageSystemPrompt(event.target.value)}
               placeholder={defaultImageSystemPrompt}
+            />
+          </label>
+
+          <label className="fieldBlock">
+            Image task prompt
+            <textarea
+              className="systemPromptInput large"
+              value={imageTaskPrompt}
+              onChange={(event) => setImageTaskPrompt(event.target.value)}
+              placeholder={defaultImageTaskPrompt}
             />
           </label>
 
@@ -1268,6 +1456,43 @@ function ModelCapabilities({ model, emptyLabel }: { model: ProviderModel | null;
   );
 }
 
+function ModelSelect({
+  models,
+  selectedId,
+  onSelect,
+  disabled,
+  selectedModel,
+  emptyLabel,
+}: {
+  models: ProviderModel[];
+  selectedId: string;
+  onSelect: (modelId: string) => void;
+  disabled: boolean;
+  selectedModel: ProviderModel | null;
+  emptyLabel: string;
+}) {
+  const hasSelectedOption = selectedId && models.some((model) => model.id === selectedId);
+
+  return (
+    <select
+      value={selectedId}
+      onChange={(event) => onSelect(event.target.value)}
+      disabled={disabled}
+      aria-label="AI scrape model"
+    >
+      {disabled || models.length === 0 ? <option value="">{emptyLabel}</option> : null}
+      {selectedId && !hasSelectedOption ? (
+        <option value={selectedId}>{selectedModel?.name ?? selectedId}</option>
+      ) : null}
+      {models.map((model) => (
+        <option key={model.id} value={model.id}>
+          {model.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function formatBalance(balance: ProviderBalance) {
   if (balance.balance !== null) {
     return `${balance.currency} ${balance.balance.toFixed(4)}`;
@@ -1398,16 +1623,94 @@ function normalizeDashboardSources(sources: NewsSource[]): NewsSource[] {
   });
 }
 
+function normalizeDashboardPromptSets(promptSets: PromptSet[]): PromptSet[] {
+  return promptSets
+    .map((promptSet) =>
+      buildCurrentPromptSet({
+        id: promptSet.id,
+        name: promptSet.name,
+        scrapeSystemPrompt: promptSet.scrapeSystemPrompt || defaultScrapeSystemPrompt,
+        scrapeTaskPrompt: promptSet.scrapeTaskPrompt || defaultScrapeTaskPrompt,
+        copySystemPrompt: promptSet.copySystemPrompt || defaultCopySystemPrompt,
+        copyTaskPrompt: promptSet.copyTaskPrompt || defaultCopyTaskPrompt,
+        imageSystemPrompt: promptSet.imageSystemPrompt || defaultImageSystemPrompt,
+        imageTaskPrompt: promptSet.imageTaskPrompt || defaultImageTaskPrompt,
+        updatedAt: promptSet.updatedAt,
+      }),
+    )
+    .filter((promptSet) => promptSet.id && promptSet.name);
+}
+
+function buildCurrentPromptSet(input: {
+  id: string;
+  name: string;
+  scrapeSystemPrompt: string;
+  scrapeTaskPrompt: string;
+  copySystemPrompt: string;
+  copyTaskPrompt: string;
+  imageSystemPrompt: string;
+  imageTaskPrompt: string;
+  updatedAt?: string;
+}): PromptSet {
+  return {
+    id: input.id,
+    name: input.name.trim() || "Untitled prompt set",
+    scrapeSystemPrompt: input.scrapeSystemPrompt,
+    scrapeTaskPrompt: input.scrapeTaskPrompt,
+    copySystemPrompt: input.copySystemPrompt,
+    copyTaskPrompt: input.copyTaskPrompt,
+    imageSystemPrompt: input.imageSystemPrompt,
+    imageTaskPrompt: input.imageTaskPrompt,
+    updatedAt: input.updatedAt || new Date().toISOString(),
+  };
+}
+
+function upsertPromptSet(promptSets: PromptSet[], promptSet: PromptSet) {
+  const next = promptSets.filter((current) => current.id !== promptSet.id);
+  return [promptSet, ...next].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+function findPromptSet(promptSets: PromptSet[], promptSetId?: string) {
+  return promptSets.find((promptSet) => promptSet.id === promptSetId) ?? null;
+}
+
+function applyPromptSetState(
+  promptSet: PromptSet,
+  setters: {
+    setSelectedPromptSetId: (value: string) => void;
+    setPromptSetName: (value: string) => void;
+    setScrapeSystemPrompt: (value: string) => void;
+    setScrapeTaskPrompt: (value: string) => void;
+    setCopySystemPrompt: (value: string) => void;
+    setCopyTaskPrompt: (value: string) => void;
+    setImageSystemPrompt: (value: string) => void;
+    setImageTaskPrompt: (value: string) => void;
+  },
+) {
+  setters.setSelectedPromptSetId(promptSet.id);
+  setters.setPromptSetName(promptSet.name);
+  setters.setScrapeSystemPrompt(promptSet.scrapeSystemPrompt);
+  setters.setScrapeTaskPrompt(promptSet.scrapeTaskPrompt);
+  setters.setCopySystemPrompt(promptSet.copySystemPrompt);
+  setters.setCopyTaskPrompt(promptSet.copyTaskPrompt);
+  setters.setImageSystemPrompt(promptSet.imageSystemPrompt);
+  setters.setImageTaskPrompt(promptSet.imageTaskPrompt);
+}
+
 function serializePreferences(input: {
   sources: NewsSource[];
   copyModel: string;
   scrapeModel: string;
   imageModel: string;
+  promptSets: PromptSet[];
+  lastPromptSetId: string;
 }) {
   return JSON.stringify({
     sources: normalizeDashboardSources(input.sources),
     copyModel: input.copyModel,
     scrapeModel: input.scrapeModel,
     imageModel: input.imageModel,
+    promptSets: normalizeDashboardPromptSets(input.promptSets),
+    lastPromptSetId: input.lastPromptSetId,
   });
 }

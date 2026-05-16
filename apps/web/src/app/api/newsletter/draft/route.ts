@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     feedback?: string;
     previousDraft?: NewsletterDraft;
     systemPrompt?: string;
+    taskPrompt?: string;
     target?: string;
   };
   if (!body.model) return NextResponse.json({ error: "model is required", balances: await getBalances() }, { status: 400 });
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
     feedback: body.feedback,
     previousDraft: body.previousDraft,
     systemPrompt: body.systemPrompt,
+    taskPrompt: body.taskPrompt,
     target: body.target,
   });
   return NextResponse.json({

@@ -1,5 +1,6 @@
 import { buildNewsletterPrompt, createFallbackDraft, parseDraftFromModel, validateNewsletterDraft } from "./draft";
 import { loadLocalEnv } from "./env";
+import { defaultCopySystemPrompt, defaultImageTaskPrompt } from "./prompts";
 import type { Article, GeneratedImage, NewsletterDraft, ProviderModel } from "./types";
 
 export async function getOpenRouterModels(): Promise<ProviderModel[]> {
@@ -54,6 +55,7 @@ export async function generateNewsletterDraft(input: {
   feedback?: string;
   previousDraft?: NewsletterDraft;
   systemPrompt?: string;
+  taskPrompt?: string;
   target?: string;
 }): Promise<{ draft: NewsletterDraft; usedFallback: boolean; raw?: string }> {
   loadLocalEnv();
@@ -71,7 +73,7 @@ export async function generateNewsletterDraft(input: {
     body: JSON.stringify({
       model: input.model,
       messages: [
-        { role: "system", content: input.systemPrompt?.trim() || "Return valid JSON only." },
+        { role: "system", content: input.systemPrompt?.trim() || defaultCopySystemPrompt },
         { role: "user", content: buildNewsletterPrompt(input) },
       ],
       temperature: 0.4,
@@ -94,10 +96,10 @@ export async function generateNewsletterDraft(input: {
   }
 }
 
-export async function generateFalImage(input: { model: string; prompt: string; feedback?: string; systemPrompt?: string }): Promise<GeneratedImage> {
+export async function generateFalImage(input: { model: string; prompt: string; feedback?: string; systemPrompt?: string; taskPrompt?: string }): Promise<GeneratedImage> {
   loadLocalEnv();
   const apiKey = process.env.FAL_KEY;
-  const prompt = buildImagePrompt(input.prompt, input.systemPrompt, input.feedback);
+  const prompt = buildImagePrompt(input.prompt, input.systemPrompt, input.feedback, input.taskPrompt);
   if (!apiKey) {
     return {
       url: "/newsletter-placeholder.svg",
@@ -123,9 +125,15 @@ export async function generateFalImage(input: { model: string; prompt: string; f
   return { url: image.url, contentType: image.content_type ?? guessContentType(image.url), model: input.model, prompt, generatedAt: new Date().toISOString() };
 }
 
-function buildImagePrompt(prompt: string, systemPrompt?: string, feedback?: string) {
-  const parts = [systemPrompt?.trim(), prompt.trim(), feedback?.trim() ? `Editor image feedback: ${feedback.trim()}` : ""].filter(Boolean);
-  return parts.join("\n\n");
+function buildImagePrompt(prompt: string, systemPrompt?: string, feedback?: string, taskPrompt?: string) {
+  const imagePrompt = prompt.trim();
+  const template = taskPrompt?.trim() || defaultImageTaskPrompt;
+  const rendered = template
+    .replaceAll("{{systemPrompt}}", systemPrompt?.trim() ?? "")
+    .replaceAll("{{imagePrompt}}", imagePrompt)
+    .replaceAll("{{feedback}}", feedback?.trim() ?? "");
+
+  return rendered.includes(imagePrompt) ? rendered : `${rendered}\n\nImage prompt:\n${imagePrompt}`;
 }
 
 export function fallbackOpenRouterModels(): ProviderModel[] {

@@ -1,6 +1,6 @@
 import { loadLocalEnv } from "./env";
 import { normalizeSources } from "./sources";
-import type { NewsletterPreferences, NewsSource } from "./types";
+import type { NewsletterPreferences, NewsSource, PromptSet } from "./types";
 
 type PreferenceRow = {
   preference_id: string;
@@ -8,6 +8,8 @@ type PreferenceRow = {
   copy_model: string | null;
   scrape_model: string | null;
   image_model: string | null;
+  prompt_sets: PromptSet[] | null;
+  last_prompt_set_id: string | null;
   updated_at: string;
 };
 
@@ -17,6 +19,8 @@ export type PreferencePayload = {
   copyModel: string;
   scrapeModel: string;
   imageModel: string;
+  promptSets: PromptSet[];
+  lastPromptSetId: string;
 };
 
 export function isPreferencesConfigured() {
@@ -39,7 +43,7 @@ export async function getPreferences(preferenceId: string): Promise<NewsletterPr
   );
 
   if (!response.ok) {
-    throw new Error(`Supabase preferences lookup failed with ${response.status}.`);
+    throw new Error(await formatSupabaseError(response, "lookup"));
   }
 
   const rows = (await response.json()) as PreferenceRow[];
@@ -59,11 +63,13 @@ export async function savePreferences(payload: PreferencePayload): Promise<Newsl
     copy_model: payload.copyModel || null,
     scrape_model: payload.scrapeModel || null,
     image_model: payload.imageModel || null,
+    prompt_sets: normalizePromptSets(payload.promptSets),
+    last_prompt_set_id: payload.lastPromptSetId || null,
     updated_at: updatedAt,
   });
 
   if (!response.ok) {
-    throw new Error(`Supabase preferences save failed with ${response.status}.`);
+    throw new Error(await formatSupabaseError(response, "save"));
   }
 
   const rows = (await response.json()) as PreferenceRow[];
@@ -77,6 +83,8 @@ function rowToPreferences(row: PreferenceRow): NewsletterPreferences {
     copyModel: row.copy_model ?? "",
     scrapeModel: row.scrape_model ?? "",
     imageModel: row.image_model ?? "",
+    promptSets: normalizePromptSets(Array.isArray(row.prompt_sets) ? row.prompt_sets : []),
+    lastPromptSetId: row.last_prompt_set_id ?? "",
     updatedAt: row.updated_at,
   };
 
@@ -98,6 +106,55 @@ function upsertPreferenceRow(client: SupabaseRestClient, body: Record<string, un
     },
     body: JSON.stringify(body),
   });
+}
+
+async function formatSupabaseError(response: Response, action: "lookup" | "save") {
+  const detail = await response.text().catch(() => "");
+  const message = parseSupabaseErrorMessage(detail);
+  const lowerMessage = message.toLowerCase();
+  return [
+    `Supabase preferences ${action} failed with ${response.status}.`,
+    message,
+    lowerMessage.includes("scrape_model") || lowerMessage.includes("prompt_sets") || lowerMessage.includes("last_prompt_set_id")
+      ? "Run npm run db:ensure-schema to update the newsletter_preferences columns."
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function normalizePromptSets(promptSets: PromptSet[]): PromptSet[] {
+  return promptSets
+    .map((promptSet) => ({
+      id: normalizePromptSetId(promptSet.id),
+      name: String(promptSet.name ?? "").trim().slice(0, 120),
+      scrapeSystemPrompt: String(promptSet.scrapeSystemPrompt ?? ""),
+      scrapeTaskPrompt: String(promptSet.scrapeTaskPrompt ?? ""),
+      copySystemPrompt: String(promptSet.copySystemPrompt ?? ""),
+      copyTaskPrompt: String(promptSet.copyTaskPrompt ?? ""),
+      imageSystemPrompt: String(promptSet.imageSystemPrompt ?? ""),
+      imageTaskPrompt: String(promptSet.imageTaskPrompt ?? ""),
+      updatedAt: String(promptSet.updatedAt ?? new Date().toISOString()),
+    }))
+    .filter((promptSet) => promptSet.id && promptSet.name);
+}
+
+function normalizePromptSetId(value: string) {
+  const normalized = String(value ?? "").trim();
+  return /^[a-zA-Z0-9_-]{8,80}$/.test(normalized) ? normalized : "";
+}
+
+function parseSupabaseErrorMessage(detail: string) {
+  if (!detail) {
+    return "";
+  }
+
+  try {
+    const payload = JSON.parse(detail) as { message?: string; details?: string; hint?: string };
+    return [payload.message, payload.details, payload.hint].filter(Boolean).join(" ");
+  } catch {
+    return detail.slice(0, 240);
+  }
 }
 
 function getSupabaseRestClient(): SupabaseRestClient | null {

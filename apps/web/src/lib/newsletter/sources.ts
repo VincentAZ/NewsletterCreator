@@ -1,13 +1,13 @@
 import type { Article, NewsSource } from "./types";
 import { loadLocalEnv } from "./env";
+import { defaultScrapeSystemPrompt, defaultScrapeTaskPrompt } from "./prompts";
 
 export const DEFAULT_SCRAPE_MODEL = "openai/gpt-4.1-mini";
-export const DEFAULT_SCRAPE_SYSTEM_PROMPT =
-  "You extract article candidates from source-page link context for an AI newsletter. Return valid JSON only.";
 
 type ScrapeOptions = {
   scrapeModel?: string;
   scrapeSystemPrompt?: string;
+  scrapeTaskPrompt?: string;
 };
 
 export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
@@ -137,6 +137,7 @@ async function scrapeWebsiteWithAi(html: string, source: NewsSource, options: Sc
     model,
     apiKey,
     systemPrompt: options.scrapeSystemPrompt,
+    taskPrompt: options.scrapeTaskPrompt,
     source,
     pageTitle,
     candidates: aiCandidates,
@@ -177,6 +178,7 @@ async function selectFeedArticlesWithAi(articles: Article[], source: NewsSource,
     model,
     apiKey,
     systemPrompt: options.scrapeSystemPrompt,
+    taskPrompt: options.scrapeTaskPrompt,
     source,
     pageTitle: `${source.name} fallback feed`,
     candidates: articles.slice(0, 80).map((article) => ({
@@ -194,10 +196,12 @@ async function askAiSourceScraper(input: {
   model: string;
   apiKey: string;
   systemPrompt?: string;
+  taskPrompt?: string;
   source: NewsSource;
   pageTitle: string;
   candidates: Array<{ title: string; url: string; summary?: string; published?: string | null }>;
 }) {
+  const userPrompt = buildScrapeTaskPrompt(input);
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -209,22 +213,11 @@ async function askAiSourceScraper(input: {
       messages: [
         {
           role: "system",
-          content: input.systemPrompt?.trim() || DEFAULT_SCRAPE_SYSTEM_PROMPT,
+          content: input.systemPrompt?.trim() || defaultScrapeSystemPrompt,
         },
         {
           role: "user",
-          content: `Source: ${input.source.name}
-Source URL: ${input.source.url}
-Page title: ${input.pageTitle || "unknown"}
-Max articles: ${input.source.limit}
-
-Choose only real article/news/story links from this page context. Ignore navigation, category pages, legal pages, social links, ads, newsletters, sign-in links, and duplicate links. Prefer recent AI, model, developer, policy, product, or research stories.
-
-Return this JSON shape:
-{"articles":[{"title":"string","url":"absolute URL","summary":"one sentence reason this is a relevant story"}]}
-
-Link candidates:
-${JSON.stringify(input.candidates)}`,
+          content: userPrompt,
         },
       ],
       temperature: 0.1,
@@ -238,6 +231,24 @@ ${JSON.stringify(input.candidates)}`,
 
   const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   return payload.choices?.[0]?.message?.content ?? "";
+}
+
+function buildScrapeTaskPrompt(input: {
+  taskPrompt?: string;
+  source: NewsSource;
+  pageTitle: string;
+  candidates: Array<{ title: string; url: string; summary?: string; published?: string | null }>;
+}) {
+  const candidatesJson = JSON.stringify(input.candidates);
+  const template = input.taskPrompt?.trim() || defaultScrapeTaskPrompt;
+  const rendered = template
+    .replaceAll("{{sourceName}}", input.source.name)
+    .replaceAll("{{sourceUrl}}", input.source.url)
+    .replaceAll("{{pageTitle}}", input.pageTitle || "unknown")
+    .replaceAll("{{maxArticles}}", String(input.source.limit))
+    .replaceAll("{{candidatesJson}}", candidatesJson);
+
+  return rendered.includes(candidatesJson) ? rendered : `${rendered}\n\nLink candidates:\n${candidatesJson}`;
 }
 
 function extractWebsiteLinkCandidates(html: string, baseUrl: string) {

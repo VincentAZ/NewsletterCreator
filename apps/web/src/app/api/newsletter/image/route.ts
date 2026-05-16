@@ -8,6 +8,7 @@ export async function POST(request: Request) {
     prompt?: string;
     feedback?: string;
     systemPrompt?: string;
+    taskPrompt?: string;
   };
 
   if (!body.model) {
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
       prompt: body.prompt,
       feedback: body.feedback,
       systemPrompt: body.systemPrompt,
+      taskPrompt: body.taskPrompt,
     });
 
     return NextResponse.json({ image, balances: await getBalances() });

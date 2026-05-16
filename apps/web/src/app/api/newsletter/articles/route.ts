@@ -8,14 +8,15 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { sources?: NewsSource[]; scrapeModel?: string; scrapeSystemPrompt?: string };
+  const body = (await request.json()) as { sources?: NewsSource[]; scrapeModel?: string; scrapeSystemPrompt?: string; scrapeTaskPrompt?: string };
   return respondWithArticles(body.sources?.length ? normalizeSources(body.sources) : DEFAULT_NEWS_SOURCES, {
     scrapeModel: body.scrapeModel,
     scrapeSystemPrompt: body.scrapeSystemPrompt,
+    scrapeTaskPrompt: body.scrapeTaskPrompt,
   });
 }
 
-async function respondWithArticles(sources: NewsSource[], options: { scrapeModel?: string; scrapeSystemPrompt?: string }) {
+async function respondWithArticles(sources: NewsSource[], options: { scrapeModel?: string; scrapeSystemPrompt?: string; scrapeTaskPrompt?: string }) {
   const balancesPromise = getBalances();
   try {
     return NextResponse.json({ ...(await gatherArticles(sources, options)), sources, balances: await balancesPromise });

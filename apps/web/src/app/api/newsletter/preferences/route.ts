@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPreferences, isPreferencesConfigured, savePreferences } from "@/lib/newsletter/preferences";
-import type { NewsSource } from "@/lib/newsletter/types";
+import type { NewsSource, PromptSet } from "@/lib/newsletter/types";
 
 export async function GET(request: Request) {
   const preferenceId = new URL(request.url).searchParams.get("preferenceId") ?? "";
@@ -33,6 +33,8 @@ export async function PUT(request: Request) {
     copyModel?: string;
     scrapeModel?: string;
     imageModel?: string;
+    promptSets?: PromptSet[];
+    lastPromptSetId?: string;
   };
 
   if (!isPreferencesConfigured()) {
@@ -52,6 +54,8 @@ export async function PUT(request: Request) {
         copyModel: body.copyModel ?? "",
         scrapeModel: body.scrapeModel ?? "",
         imageModel: body.imageModel ?? "",
+        promptSets: Array.isArray(body.promptSets) ? body.promptSets : [],
+        lastPromptSetId: body.lastPromptSetId ?? "",
       }),
     });
   } catch (error) {
