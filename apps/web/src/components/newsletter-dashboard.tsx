@@ -1378,9 +1378,9 @@ export function NewsletterDashboard() {
               <div className="mailchimpResult">
                 <strong>{mailchimpCampaign.title}</strong>
                 <span>Campaign ID: {mailchimpCampaign.id}</span>
-                {mailchimpCampaign.archiveUrl ? (
-                  <a href={mailchimpCampaign.archiveUrl} target="_blank" rel="noreferrer">
-                    Preview
+                {mailchimpCampaign.adminUrl ? (
+                  <a href={mailchimpCampaign.adminUrl} target="_blank" rel="noreferrer">
+                    Open draft
                   </a>
                 ) : null}
               </div>

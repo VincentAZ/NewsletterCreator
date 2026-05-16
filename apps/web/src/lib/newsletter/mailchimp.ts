@@ -88,6 +88,7 @@ export async function createMailchimpCampaignDraft(input: {
     title: campaign.settings?.title ?? title,
     status: campaign.status,
     archiveUrl: campaign.archive_url,
+    adminUrl: campaign.web_id ? `https://${config.server}.admin.mailchimp.com/campaigns/show?id=${campaign.web_id}` : undefined,
     checklist,
   };
 }
@@ -199,6 +200,14 @@ async function setCampaignContent(
     method: "PUT",
     body: JSON.stringify(buildMailchimpCampaignContent(draft, image)),
   });
+
+  const content = await mailchimpFetch<MailchimpCampaignContentResponse>(config, `/campaigns/${campaignId}/content`, {
+    method: "GET",
+  }).catch(() => null);
+
+  if (!content?.html || !hasGeneratedNewsletterContent(content.html, draft)) {
+    throw new Error("Mailchimp saved the draft but did not return previewable HTML content. Open the draft in Mailchimp and check the template/content builder.");
+  }
 }
 
 function hasGeneratedNewsletterContent(html: string, draft: NewsletterDraft) {

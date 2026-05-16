@@ -28,6 +28,33 @@
 
 ---
 
+# Mailchimp Preview Visibility Debug
+
+## Plan
+
+- [x] Capture the repeated preview failure as a lesson.
+- [x] Inspect newest Mailchimp draft metadata/content through read-only API calls.
+- [x] Identify whether the draft is missing content, missing template association, missing preview URL, or blocked by Mailchimp checklist items.
+- [x] Patch the minimal Mailchimp flow needed to create previewable drafts.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] Read-only Mailchimp draft/content inspection
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Read-only Mailchimp inspection found the newest draft `ce717bed83` had `plain_text_length` 1065 but `html_length` 0, so Mailchimp had no HTML to preview.
+- The app now verifies the final stored campaign content after the HTML fallback and throws a clear error if Mailchimp still does not return previewable HTML.
+- The dashboard no longer labels the public archive URL as `Preview`; new results link to the Mailchimp admin draft page using `web_id`.
+- README now documents that public campaign/archive URLs are only reliable after sending.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
 # Mailchimp Blank Preview Regression
 
 ## Plan

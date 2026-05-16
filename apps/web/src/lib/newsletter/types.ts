@@ -96,6 +96,7 @@ export type MailchimpCampaignDraft = {
   title: string;
   status?: string;
   archiveUrl?: string;
+  adminUrl?: string;
   checklist?: string[];
 };
 
