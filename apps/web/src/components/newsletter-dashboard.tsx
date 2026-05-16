@@ -169,6 +169,7 @@ export function NewsletterDashboard() {
   const [preferenceId, setPreferenceId] = useState("");
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const lastSavedPreferences = useRef("");
+  const preferenceSaveSequence = useRef(0);
 
   const selectedArticles = useMemo(() => {
     return articles.filter((article) => selectedArticleIds.has(article.id));
@@ -204,6 +205,29 @@ export function NewsletterDashboard() {
   const selectedImageModel = useMemo(() => {
     return falModels.find((model) => model.id === imageModel) ?? null;
   }, [falModels, imageModel]);
+  const currentPromptSet = useMemo(
+    () =>
+      buildCurrentPromptSet({
+        id: selectedPromptSetId || "current-workflow-prompts",
+        name: promptSetName,
+        scrapeSystemPrompt,
+        scrapeTaskPrompt,
+        copySystemPrompt,
+        copyTaskPrompt,
+        imageSystemPrompt,
+        imageTaskPrompt,
+      }),
+    [
+      copySystemPrompt,
+      copyTaskPrompt,
+      imageSystemPrompt,
+      imageTaskPrompt,
+      promptSetName,
+      scrapeSystemPrompt,
+      scrapeTaskPrompt,
+      selectedPromptSetId,
+    ],
+  );
 
   const canGatherNews = openRouterModels.length > 0 && Boolean(scrapeModel) && enabledSourceCount > 0 && !isBusy;
   const canGenerateDraft = copyModel && selectedArticles.length > 0 && !isBusy;
@@ -253,7 +277,11 @@ export function NewsletterDashboard() {
         setImageModel(preferences.imageModel);
       }
       const savedPromptSets = normalizeDashboardPromptSets(preferences?.promptSets ?? []);
-      const lastPromptSet = findPromptSet(savedPromptSets, preferences?.lastPromptSetId) ?? savedPromptSets[0] ?? null;
+      const currentSavedPromptSet = preferences?.currentPromptSet
+        ? normalizeDashboardPromptSets([preferences.currentPromptSet])[0] ?? null
+        : null;
+      const lastPromptSet =
+        currentSavedPromptSet ?? findPromptSet(savedPromptSets, preferences?.lastPromptSetId) ?? savedPromptSets[0] ?? null;
       setPromptSets(savedPromptSets);
       if (lastPromptSet) {
         applyPromptSetState(lastPromptSet, {
@@ -273,6 +301,7 @@ export function NewsletterDashboard() {
             copyModel: preferences.copyModel ?? "",
             scrapeModel: preferences.scrapeModel ?? "",
             imageModel: preferences.imageModel ?? "",
+            currentPromptSet: lastPromptSet,
             promptSets: savedPromptSets,
             lastPromptSetId: lastPromptSet?.id ?? preferences.lastPromptSetId ?? "",
           })
@@ -312,6 +341,7 @@ export function NewsletterDashboard() {
       copyModel,
       scrapeModel,
       imageModel,
+      currentPromptSet,
       promptSets,
       lastPromptSetId: selectedPromptSetId,
     };
@@ -320,12 +350,16 @@ export function NewsletterDashboard() {
       return;
     }
 
+    const saveVersion = ++preferenceSaveSequence.current;
     const timeout = window.setTimeout(() => {
       void putJson<PreferencesPayload>("/api/newsletter/preferences", {
         preferenceId,
         ...preferences,
       })
         .then((payload) => {
+          if (saveVersion !== preferenceSaveSequence.current) {
+            return;
+          }
           if (!payload.configured) {
             setStatus("Supabase is required to persist dashboard preferences. Add Supabase env vars and run the schema script.");
             return;
@@ -337,12 +371,15 @@ export function NewsletterDashboard() {
           lastSavedPreferences.current = serialized;
         })
         .catch(() => {
+          if (saveVersion !== preferenceSaveSequence.current) {
+            return;
+          }
           setStatus("Database preferences failed to save. Check Supabase configuration and schema.");
         });
     }, 600);
 
     return () => window.clearTimeout(timeout);
-  }, [copyModel, imageModel, preferenceId, preferencesLoaded, promptSets, scrapeModel, selectedPromptSetId, sources]);
+  }, [copyModel, currentPromptSet, imageModel, preferenceId, preferencesLoaded, promptSets, scrapeModel, selectedPromptSetId, sources]);
 
   async function loadModels() {
     setIsBusy(true);
@@ -637,6 +674,7 @@ export function NewsletterDashboard() {
 
     try {
       await persistPreferencesNow({
+        currentPromptSet: promptSet,
         promptSets: nextPromptSets,
         lastPromptSetId: promptSet.id,
       });
@@ -676,7 +714,7 @@ export function NewsletterDashboard() {
       setImageTaskPrompt,
     });
     setStatus(`Loaded prompt set: ${promptSet.name}.`);
-    void persistPreferencesNow({ lastPromptSetId: promptSet.id }).catch((error) => {
+    void persistPreferencesNow({ currentPromptSet: promptSet, lastPromptSetId: promptSet.id }).catch((error) => {
       setStatus(error instanceof Error ? error.message : "Last used prompt save failed.");
     });
   }
@@ -686,6 +724,7 @@ export function NewsletterDashboard() {
     copyModel: string;
     scrapeModel: string;
     imageModel: string;
+    currentPromptSet: PromptSet | null;
     promptSets: PromptSet[];
     lastPromptSetId: string;
   }>) {
@@ -698,14 +737,20 @@ export function NewsletterDashboard() {
       copyModel,
       scrapeModel,
       imageModel,
+      currentPromptSet,
       promptSets,
       lastPromptSetId: selectedPromptSetId,
       ...overrides,
     };
+    const saveVersion = ++preferenceSaveSequence.current;
     const payload = await putJson<PreferencesPayload>("/api/newsletter/preferences", {
       preferenceId: id,
       ...preferences,
     });
+
+    if (saveVersion !== preferenceSaveSequence.current) {
+      return;
+    }
 
     if (!payload.configured) {
       setStatus("Supabase is required to save prompts. Add Supabase env vars and run the schema script.");
@@ -1702,6 +1747,7 @@ function serializePreferences(input: {
   copyModel: string;
   scrapeModel: string;
   imageModel: string;
+  currentPromptSet: PromptSet | null;
   promptSets: PromptSet[];
   lastPromptSetId: string;
 }) {
@@ -1710,6 +1756,7 @@ function serializePreferences(input: {
     copyModel: input.copyModel,
     scrapeModel: input.scrapeModel,
     imageModel: input.imageModel,
+    currentPromptSet: input.currentPromptSet ? buildCurrentPromptSet(input.currentPromptSet) : null,
     promptSets: normalizeDashboardPromptSets(input.promptSets),
     lastPromptSetId: input.lastPromptSetId,
   });

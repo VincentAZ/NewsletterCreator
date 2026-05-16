@@ -1,3 +1,61 @@
+# Editable Preferences Persistence Audit
+
+## Plan
+
+- [x] Trace source editing from dashboard input handlers through preference save and reload.
+- [x] Audit every user-editable dashboard setting against the database preference payload.
+- [x] Fix missing persistence/load mappings with minimal schema/API/UI changes.
+- [x] Verify source URL updates persist after save and reload, including page/model load paths where applicable.
+- [x] Run typecheck/build verification and document results.
+
+## Verification
+
+- [x] Focused preference save/load check
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Source URL edits were already wired into the dashboard state and preferences payload, but autosave requests could finish out of order and let an older source snapshot win.
+- Added a save-version guard around debounced and immediate preference saves so stale responses cannot mark old editable state as current.
+- Added the currently edited prompt values to the preference row as `current_prompt_set`, so editable prompt fields are included in page/model-load persistence instead of only named prompt snapshots.
+- Updated the preferences API/types/schema docs for `current_prompt_set`.
+- Added a Supabase save fallback that drops missing optional preference columns one at a time, so stale live schemas no longer block source URL persistence.
+- `npm run db:ensure-schema` still cannot connect to the Supabase Postgres hostname from this machine; it fails on DNS for `db.<project-ref>.supabase.co`.
+- Focused API check through local Next on `127.0.0.1:3003` saved and reloaded a changed source URL successfully, then removed the temporary test row.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
+# Mailchimp Blank Preview Regression
+
+## Plan
+
+- [x] Capture the correction lesson from the blank preview regression.
+- [x] Verify the Mailchimp template/content API behavior against official docs.
+- [x] Replace the fragile template-section payload with a preview-reliable content path.
+- [x] Keep `MAILCHIMP_TEMPLATE_ID` available only where it does not risk blank campaign content.
+- [x] Update README to explain the reliable preview behavior and template caveat.
+- [x] Run typecheck/build verification.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Mailchimp template section content is still attempted when `MAILCHIMP_TEMPLATE_ID` is configured.
+- After the template content update, the app now reads campaign content back from Mailchimp and verifies the generated newsletter text appears in the rendered HTML.
+- If Mailchimp accepts the template payload but does not render the generated newsletter content, the same draft is rewritten with full rendered HTML plus plain text so the preview is not blank.
+- README now documents the template attempt plus reliable HTML fallback behavior.
+- `tasks/lessons.md` was updated to prevent defaulting to fragile raw template-section payloads for preview-critical drafts.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
 # Dev Server Missing Manifest Fix
 
 ---

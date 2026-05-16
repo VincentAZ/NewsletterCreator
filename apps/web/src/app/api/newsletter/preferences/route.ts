@@ -33,6 +33,7 @@ export async function PUT(request: Request) {
     copyModel?: string;
     scrapeModel?: string;
     imageModel?: string;
+    currentPromptSet?: PromptSet | null;
     promptSets?: PromptSet[];
     lastPromptSetId?: string;
   };
@@ -54,6 +55,7 @@ export async function PUT(request: Request) {
         copyModel: body.copyModel ?? "",
         scrapeModel: body.scrapeModel ?? "",
         imageModel: body.imageModel ?? "",
+        currentPromptSet: body.currentPromptSet ?? null,
         promptSets: Array.isArray(body.promptSets) ? body.promptSets : [],
         lastPromptSetId: body.lastPromptSetId ?? "",
       }),

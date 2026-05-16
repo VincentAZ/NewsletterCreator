@@ -4,6 +4,7 @@ create table if not exists public.newsletter_preferences (
   copy_model text,
   scrape_model text,
   image_model text,
+  current_prompt_set jsonb,
   prompt_sets jsonb not null default '[]'::jsonb,
   last_prompt_set_id text,
   updated_at timestamptz not null default now()
@@ -14,6 +15,7 @@ alter table public.newsletter_preferences
   add column if not exists copy_model text,
   add column if not exists scrape_model text,
   add column if not exists image_model text,
+  add column if not exists current_prompt_set jsonb,
   add column if not exists prompt_sets jsonb not null default '[]'::jsonb,
   add column if not exists last_prompt_set_id text,
   add column if not exists updated_at timestamptz not null default now();

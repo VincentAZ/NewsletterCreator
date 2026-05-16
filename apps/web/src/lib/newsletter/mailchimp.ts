@@ -37,6 +37,10 @@ type MailchimpChecklistResponse = {
   }>;
 };
 
+type MailchimpCampaignContentResponse = {
+  html?: string;
+};
+
 export function isMailchimpConfigured() {
   loadLocalEnv();
   return Boolean(
@@ -75,10 +79,7 @@ export async function createMailchimpCampaignDraft(input: {
     throw new Error("Mailchimp created a campaign without returning an id.");
   }
 
-  await mailchimpFetch(config, `/campaigns/${campaign.id}/content`, {
-    method: "PUT",
-    body: JSON.stringify(buildMailchimpCampaignContent(input.draft, input.image, config.template)),
-  });
+  await setCampaignContent(config, campaign.id, input.draft, input.image);
   const checklist = await getCampaignChecklist(config, campaign.id);
 
   return {
@@ -171,6 +172,67 @@ export function buildMailchimpCampaignContent(
     html: renderNewsletterHtml(draft, image),
     plain_text: plainText,
   };
+}
+
+async function setCampaignContent(
+  config: MailchimpConfig,
+  campaignId: string,
+  draft: NewsletterDraft,
+  image: GeneratedImage,
+) {
+  if (config.template) {
+    await mailchimpFetch(config, `/campaigns/${campaignId}/content`, {
+      method: "PUT",
+      body: JSON.stringify(buildMailchimpCampaignContent(draft, image, config.template)),
+    });
+
+    const content = await mailchimpFetch<MailchimpCampaignContentResponse>(config, `/campaigns/${campaignId}/content`, {
+      method: "GET",
+    }).catch(() => null);
+
+    if (content?.html && hasGeneratedNewsletterContent(content.html, draft)) {
+      return;
+    }
+  }
+
+  await mailchimpFetch(config, `/campaigns/${campaignId}/content`, {
+    method: "PUT",
+    body: JSON.stringify(buildMailchimpCampaignContent(draft, image)),
+  });
+}
+
+function hasGeneratedNewsletterContent(html: string, draft: NewsletterDraft) {
+  const normalizedHtml = normalizeContentText(stripHtmlTags(html));
+  const subject = normalizeContentText(draft.subject);
+  const intro = normalizeContentText(draft.intro);
+  const firstHeading = normalizeContentText(draft.sections[0]?.heading ?? "");
+
+  return Boolean(
+    subject &&
+      normalizedHtml.includes(subject) &&
+      ((intro && normalizedHtml.includes(intro.slice(0, 80))) ||
+        (firstHeading && normalizedHtml.includes(firstHeading))),
+  );
+}
+
+function stripHtmlTags(value: string) {
+  return value
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function normalizeContentText(value: string) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function buildMailchimpTemplateSections(

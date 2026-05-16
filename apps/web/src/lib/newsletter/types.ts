@@ -105,6 +105,7 @@ export type NewsletterPreferences = {
   copyModel: string;
   scrapeModel: string;
   imageModel: string;
+  currentPromptSet: PromptSet | null;
   promptSets: PromptSet[];
   lastPromptSetId: string;
   updatedAt: string;

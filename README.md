@@ -33,13 +33,13 @@ $env:MAILCHIMP_SECTION_BODY = "body"
 
 `FAL_KEY` should be an Admin key if you want the app to display account credits from fal's billing endpoint.
 
-Supabase is required for persisted dashboard preferences. Custom sources, the selected copy model, the selected AI scrape/source model, the selected image model, saved prompt sets, and the last used prompt set are stored in the `newsletter_preferences` table under the stable `default-preferences` row.
+Supabase is required for persisted dashboard preferences. Custom sources, selected models, the currently edited workflow prompts, saved prompt sets, and the last used prompt set are stored in the `newsletter_preferences` table under the stable `default-preferences` row.
 
 Mailchimp is configured once through `.env`. `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID`, `MAILCHIMP_FROM_NAME`, and `MAILCHIMP_REPLY_TO` are required to create a draft campaign. `MAILCHIMP_REPLY_TO` must be a real sender address Mailchimp accepts for the account. If `MAILCHIMP_SERVER` is omitted, the app infers it from the API key suffix, for example `us21`.
 
-Set `MAILCHIMP_TEMPLATE_ID` to use a saved Classic Mailchimp template. The template must expose editable `mc:edit` regions for the newsletter content. By default the app fills `preheader`, `intro`, `hero_image`, and `body`; override those names with `MAILCHIMP_SECTION_PREHEADER`, `MAILCHIMP_SECTION_INTRO`, `MAILCHIMP_SECTION_HERO_IMAGE`, and `MAILCHIMP_SECTION_BODY` if your template uses different editable section names. Restart the Next dev server after changing `.env`.
+Set `MAILCHIMP_TEMPLATE_ID` to try a saved Classic Mailchimp template first. The template must expose editable `mc:edit` regions for the newsletter content. By default the app fills `preheader`, `intro`, `hero_image`, and `body`; override those names with `MAILCHIMP_SECTION_PREHEADER`, `MAILCHIMP_SECTION_INTRO`, `MAILCHIMP_SECTION_HERO_IMAGE`, and `MAILCHIMP_SECTION_BODY` if your template uses different editable section names. Restart the Next dev server after changing `.env`.
 
-After copy and image generation, click `Populate Mailchimp` to create a draft campaign with the configured template. If `MAILCHIMP_TEMPLATE_ID` is omitted, the app falls back to rendered HTML content. The app does not send or schedule campaigns.
+After copy and image generation, click `Populate Mailchimp` to create a draft campaign. If `MAILCHIMP_TEMPLATE_ID` is set, the app sends template section content, reads the campaign content back from Mailchimp, and falls back to rendered HTML if the generated newsletter does not appear in the rendered preview. If `MAILCHIMP_TEMPLATE_ID` is omitted, the app uses rendered HTML content immediately. The app does not send or schedule campaigns.
 
 Apply or update the Supabase schema:
 
@@ -56,6 +56,7 @@ create table if not exists public.newsletter_preferences (
   copy_model text,
   scrape_model text,
   image_model text,
+  current_prompt_set jsonb,
   prompt_sets jsonb not null default '[]'::jsonb,
   last_prompt_set_id text,
   updated_at timestamptz not null default now()

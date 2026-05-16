@@ -9,6 +9,7 @@
 - When helping with Mailchimp setup, state the required `.env` values up front: `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID`, `MAILCHIMP_FROM_NAME`, and `MAILCHIMP_REPLY_TO`.
 - For this app, treat Mailchimp as a single-user HTML campaign integration. Do not add dashboard/database complexity for switching templates or section maps unless the user explicitly asks for multi-template support.
 - For Mailchimp preview issues, avoid `template.sections` unless the configured Classic template has verified editable default-content sections. The reliable preview path is a regular campaign followed by full `html` plus `plain_text` content.
+- Do not switch NewsletterCreator back to raw Mailchimp `template.sections` as the default preview path just because `MAILCHIMP_TEMPLATE_ID` is set; in this app it can create drafts with blank Mailchimp previews when section names/default-content regions do not match exactly. Prefer full `html` content for preview reliability unless template section compatibility is verified.
 - For website source gathering, do not treat any nonzero scrape result as complete. If direct scraping returns fewer than the source limit, supplement from the fallback feed before applying the limit.
 - When reproducing a source-gathering bug, use the exact persisted source URL from preferences. Similar domains can have very different fallback coverage, as with `the-decoder.de` versus `the-decoder.com`.
 - After fixing a deployment failure locally, compare the failed deploy commit with local `HEAD` and the remote branch before declaring the fix ready; Vercel only sees pushed commits from the connected repository.
@@ -20,3 +21,4 @@
 - For Vercel team deploys, align git author email with a Vercel team member email before pushing, instead of relying on GitHub org OAuth labels to satisfy commit-author verification.
 - Before clearing generated `.next` output on Windows, stop all Next dev/build processes for this repo. A live dev server can leave `.next/dev` metadata partially deleted and cause missing `app-paths-manifest.json` 500s.
 - When the user is running `npm run dev` in their own terminal, do not leave a Codex-started background Next dev server running on the same repo/port. Stop Codex-owned dev servers after verification unless the user explicitly wants it kept alive.
+- For NewsletterCreator preferences, every user-editable control must be included in the database-backed preference payload and reload path. Treat autosave ordering as part of persistence correctness; stale save responses must not be allowed to overwrite newer edits.

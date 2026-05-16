@@ -8,6 +8,7 @@ type PreferenceRow = {
   copy_model: string | null;
   scrape_model: string | null;
   image_model: string | null;
+  current_prompt_set: PromptSet | null;
   prompt_sets: PromptSet[] | null;
   last_prompt_set_id: string | null;
   updated_at: string;
@@ -19,6 +20,7 @@ export type PreferencePayload = {
   copyModel: string;
   scrapeModel: string;
   imageModel: string;
+  currentPromptSet: PromptSet | null;
   promptSets: PromptSet[];
   lastPromptSetId: string;
 };
@@ -57,16 +59,18 @@ export async function savePreferences(payload: PreferencePayload): Promise<Newsl
   }
 
   const updatedAt = new Date().toISOString();
-  const response = await upsertPreferenceRow(client, {
+  const row = {
     preference_id: payload.preferenceId,
     sources: normalizeSources(payload.sources),
     copy_model: payload.copyModel || null,
     scrape_model: payload.scrapeModel || null,
     image_model: payload.imageModel || null,
+    current_prompt_set: normalizeCurrentPromptSet(payload.currentPromptSet),
     prompt_sets: normalizePromptSets(payload.promptSets),
     last_prompt_set_id: payload.lastPromptSetId || null,
     updated_at: updatedAt,
-  });
+  };
+  const response = await upsertPreferenceRowWithSchemaFallback(client, row);
 
   if (!response.ok) {
     throw new Error(await formatSupabaseError(response, "save"));
@@ -83,6 +87,7 @@ function rowToPreferences(row: PreferenceRow): NewsletterPreferences {
     copyModel: row.copy_model ?? "",
     scrapeModel: row.scrape_model ?? "",
     imageModel: row.image_model ?? "",
+    currentPromptSet: normalizeCurrentPromptSet(row.current_prompt_set),
     promptSets: normalizePromptSets(Array.isArray(row.prompt_sets) ? row.prompt_sets : []),
     lastPromptSetId: row.last_prompt_set_id ?? "",
     updatedAt: row.updated_at,
@@ -108,6 +113,45 @@ function upsertPreferenceRow(client: SupabaseRestClient, body: Record<string, un
   });
 }
 
+async function upsertPreferenceRowWithSchemaFallback(client: SupabaseRestClient, row: Record<string, unknown>) {
+  const body = { ...row };
+  const optionalColumns = new Set(["scrape_model", "image_model", "current_prompt_set", "prompt_sets", "last_prompt_set_id"]);
+
+  for (let attempt = 0; attempt < optionalColumns.size + 1; attempt += 1) {
+    const response = await upsertPreferenceRow(client, body);
+    if (response.ok) {
+      return response;
+    }
+
+    const detail = await response.text().catch(() => "");
+    const missingColumn = extractMissingPreferenceColumn(detail);
+    if (!missingColumn || !optionalColumns.has(missingColumn) || !(missingColumn in body)) {
+      return responseFromText(response, detail);
+    }
+
+    delete body[missingColumn];
+  }
+
+  return upsertPreferenceRow(client, body);
+}
+
+function extractMissingPreferenceColumn(detail: string) {
+  const message = parseSupabaseErrorMessage(detail);
+  return (
+    message.match(/column newsletter_preferences\.([a-z_]+) does not exist/i)?.[1] ??
+    message.match(/Could not find the '([a-z_]+)' column of 'newsletter_preferences'/i)?.[1] ??
+    ""
+  );
+}
+
+function responseFromText(response: Response, detail: string) {
+  return new Response(detail, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
 async function formatSupabaseError(response: Response, action: "lookup" | "save") {
   const detail = await response.text().catch(() => "");
   const message = parseSupabaseErrorMessage(detail);
@@ -115,12 +159,23 @@ async function formatSupabaseError(response: Response, action: "lookup" | "save"
   return [
     `Supabase preferences ${action} failed with ${response.status}.`,
     message,
-    lowerMessage.includes("scrape_model") || lowerMessage.includes("prompt_sets") || lowerMessage.includes("last_prompt_set_id")
+    lowerMessage.includes("scrape_model") ||
+    lowerMessage.includes("current_prompt_set") ||
+    lowerMessage.includes("prompt_sets") ||
+    lowerMessage.includes("last_prompt_set_id")
       ? "Run npm run db:ensure-schema to update the newsletter_preferences columns."
       : "",
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+function normalizeCurrentPromptSet(promptSet: PromptSet | null | undefined): PromptSet | null {
+  if (!promptSet) {
+    return null;
+  }
+
+  return normalizePromptSets([promptSet])[0] ?? null;
 }
 
 function normalizePromptSets(promptSets: PromptSet[]): PromptSet[] {
