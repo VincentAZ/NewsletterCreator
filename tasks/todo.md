@@ -28,6 +28,33 @@
 
 ---
 
+# Mailchimp Preview Still Blank
+
+## Plan
+
+- [ ] Capture the correction that repeating UI instructions is not useful here.
+- [ ] Inspect the latest Mailchimp draft content and checklist state.
+- [ ] Create a controlled draft through the current code path and read back Mailchimp content.
+- [x] Patch the content path to the simplest preview-reliable behavior observed.
+- [x] Verify with Mailchimp read-back plus typecheck/build.
+
+## Verification
+
+- [x] Mailchimp read-back shows non-empty HTML content on a new controlled draft.
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Latest user-created draft `8850940784` had `template_id` 10032140, non-empty plain text, and `html_length` 0, confirming the template-section path still produced no previewable HTML.
+- A controlled direct-HTML smoke draft stored non-empty HTML and included the generated subject in Mailchimp read-back; the temporary smoke draft was deleted.
+- Removed the template-section content branch so `Populate Mailchimp` always writes full rendered HTML plus plain text.
+- README now documents that `MAILCHIMP_TEMPLATE_ID` is intentionally not used because this account's template-section API path can produce blank previews.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
 # Mailchimp Preview Visibility Debug
 
 ## Plan

@@ -22,13 +22,8 @@ $env:SUPABASE_DB_URL = "postgresql://postgres..."
 $env:SUPABASE_DB_PASSWORD = "..."
 $env:MAILCHIMP_API_KEY = "..."
 $env:MAILCHIMP_LIST_ID = "..."
-$env:MAILCHIMP_TEMPLATE_ID = "123456"
 $env:MAILCHIMP_FROM_NAME = "Your newsletter"
 $env:MAILCHIMP_REPLY_TO = "newsletter@example.com"
-$env:MAILCHIMP_SECTION_PREHEADER = "preheader"
-$env:MAILCHIMP_SECTION_INTRO = "intro"
-$env:MAILCHIMP_SECTION_HERO_IMAGE = "hero_image"
-$env:MAILCHIMP_SECTION_BODY = "body"
 ```
 
 `FAL_KEY` should be an Admin key if you want the app to display account credits from fal's billing endpoint.
@@ -37,9 +32,7 @@ Supabase is required for persisted dashboard preferences. Custom sources, select
 
 Mailchimp is configured once through `.env`. `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID`, `MAILCHIMP_FROM_NAME`, and `MAILCHIMP_REPLY_TO` are required to create a draft campaign. `MAILCHIMP_REPLY_TO` must be a real sender address Mailchimp accepts for the account. If `MAILCHIMP_SERVER` is omitted, the app infers it from the API key suffix, for example `us21`.
 
-Set `MAILCHIMP_TEMPLATE_ID` to try a saved Classic Mailchimp template first. The template must expose editable `mc:edit` regions for the newsletter content. By default the app fills `preheader`, `intro`, `hero_image`, and `body`; override those names with `MAILCHIMP_SECTION_PREHEADER`, `MAILCHIMP_SECTION_INTRO`, `MAILCHIMP_SECTION_HERO_IMAGE`, and `MAILCHIMP_SECTION_BODY` if your template uses different editable section names. Restart the Next dev server after changing `.env`.
-
-After copy and image generation, click `Populate Mailchimp` to create a draft campaign. If `MAILCHIMP_TEMPLATE_ID` is set, the app sends template section content, reads the campaign content back from Mailchimp, and falls back to rendered HTML if the generated newsletter does not appear in the rendered preview. If `MAILCHIMP_TEMPLATE_ID` is omitted, the app uses rendered HTML content immediately. The app links to the draft inside Mailchimp's admin UI because public campaign/archive URLs are only reliable after sending. The app does not send or schedule campaigns.
+After copy and image generation, click `Populate Mailchimp` to create a draft campaign with rendered HTML content. The app intentionally does not use `MAILCHIMP_TEMPLATE_ID` because this account's template-section API path can create drafts with plain text but no previewable HTML. The app links to the draft inside Mailchimp's admin UI because public campaign/archive URLs are only reliable after sending. The app does not send or schedule campaigns.
 
 Apply or update the Supabase schema:
 
