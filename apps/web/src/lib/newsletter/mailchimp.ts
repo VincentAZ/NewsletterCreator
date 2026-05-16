@@ -5,15 +5,8 @@ type MailchimpConfig = {
   apiKey: string;
   server: string;
   listId: string;
-  templateId: number;
   fromName: string;
   replyTo: string;
-  sectionNames: {
-    preheader: string;
-    intro: string;
-    heroImage: string;
-    body: string;
-  };
 };
 
 type MailchimpCampaignResponse = {
@@ -38,7 +31,6 @@ export function isMailchimpConfigured() {
   return Boolean(
     process.env.MAILCHIMP_API_KEY &&
       process.env.MAILCHIMP_LIST_ID &&
-      process.env.MAILCHIMP_TEMPLATE_ID &&
       process.env.MAILCHIMP_FROM_NAME &&
       process.env.MAILCHIMP_REPLY_TO,
   );
@@ -55,7 +47,6 @@ export async function createMailchimpCampaignDraft(input: {
     method: "POST",
     body: JSON.stringify({
       type: "regular",
-      content_type: "template",
       recipients: {
         list_id: config.listId,
       },
@@ -75,7 +66,7 @@ export async function createMailchimpCampaignDraft(input: {
 
   await mailchimpFetch(config, `/campaigns/${campaign.id}/content`, {
     method: "PUT",
-    body: JSON.stringify(buildCampaignContent(config, input.draft, input.image)),
+    body: JSON.stringify(buildMailchimpCampaignContent(input.draft, input.image)),
   });
   const checklist = await getCampaignChecklist(config, campaign.id);
 
@@ -94,7 +85,6 @@ function getMailchimpConfig(): MailchimpConfig {
   const apiKey = process.env.MAILCHIMP_API_KEY;
   const listId = process.env.MAILCHIMP_LIST_ID;
   const server = process.env.MAILCHIMP_SERVER || apiKey?.split("-").at(-1);
-  const configuredTemplateId = Number(process.env.MAILCHIMP_TEMPLATE_ID);
   const fromName = process.env.MAILCHIMP_FROM_NAME?.trim();
   const replyTo = process.env.MAILCHIMP_REPLY_TO?.trim();
 
@@ -107,9 +97,6 @@ function getMailchimpConfig(): MailchimpConfig {
   if (!listId) {
     throw new Error("MAILCHIMP_LIST_ID is not configured.");
   }
-  if (!Number.isFinite(configuredTemplateId) || configuredTemplateId <= 0) {
-    throw new Error("MAILCHIMP_TEMPLATE_ID is not configured.");
-  }
   if (!fromName) {
     throw new Error("MAILCHIMP_FROM_NAME is not configured.");
   }
@@ -121,29 +108,14 @@ function getMailchimpConfig(): MailchimpConfig {
     apiKey,
     server,
     listId,
-    templateId: configuredTemplateId,
     fromName,
     replyTo,
-    sectionNames: {
-      preheader: process.env.MAILCHIMP_SECTION_PREHEADER?.trim() || "preheader",
-      intro: process.env.MAILCHIMP_SECTION_INTRO?.trim() || "intro",
-      heroImage: process.env.MAILCHIMP_SECTION_HERO_IMAGE?.trim() || "hero_image",
-      body: process.env.MAILCHIMP_SECTION_BODY?.trim() || "body",
-    },
   };
 }
 
-function buildCampaignContent(config: MailchimpConfig, draft: NewsletterDraft, image: GeneratedImage) {
+export function buildMailchimpCampaignContent(draft: NewsletterDraft, image: GeneratedImage) {
   return {
-    template: {
-      id: config.templateId,
-      sections: {
-        [config.sectionNames.preheader]: escapeHtml(draft.preheader),
-        [config.sectionNames.intro]: renderIntroHtml(draft),
-        [config.sectionNames.heroImage]: renderHeroImageHtml(image, draft.subject),
-        [config.sectionNames.body]: renderSectionsHtml(draft),
-      },
-    },
+    html: renderNewsletterHtml(draft, image),
     plain_text: renderNewsletterText(draft),
   };
 }

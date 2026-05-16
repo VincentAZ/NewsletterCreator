@@ -736,6 +736,36 @@
 - [x] `npm run typecheck`
 - [x] `npm run build`
 - [x] If build hits the recurring Windows `.next` `EPERM`, clear generated `.next` read-only attributes and rerun `npm run build`.
+
+---
+
+# Mailchimp Blank Preview Fix
+
+## Plan
+
+- [x] Reproduce the current Mailchimp content payload shape from code and identify why Mailchimp preview can render blank.
+- [x] Change the Mailchimp content update to provide full rendered HTML plus plain text while preserving required campaign settings.
+- [x] Run a focused Mailchimp payload smoke check so the preview path cannot regress silently.
+- [x] Run typecheck/build verification.
+- [x] Document results and remaining Mailchimp account-side checks.
+
+## Verification
+
+- [x] Mailchimp payload smoke check
+- [x] `npm run typecheck`
+- [x] `npm run build`
+
+## Review
+
+- Root cause: the configured Mailchimp template exposes zero editable default-content sections, so the previous `template.sections` payload could be accepted without producing visible preview content.
+- Campaign creation now uses a normal regular campaign and updates `/campaigns/{id}/content` with full rendered `html` plus `plain_text`.
+- Removed the runtime dependency on `MAILCHIMP_TEMPLATE_ID` and `MAILCHIMP_SECTION_*` values; README now documents only the Mailchimp values required by the current HTML-content flow.
+- A temporary Mailchimp draft smoke test confirmed full HTML content is stored by Mailchimp, then deleted the temporary draft.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+---
+
 - [x] Verify Mailchimp preference reload in a browser context; first attempt found no dashboard DOM on the active port, so confirm the served app target.
 
 ## Review
