@@ -1,3 +1,27 @@
+# Mailchimp Preview-Matched Template HTML
+
+## Plan
+
+- [x] Create a new `template-HTML` file for the Mailchimp Classic template.
+- [x] Keep the app-compatible editable regions: `preheader`, `intro`, `hero_image`, and `body`.
+- [x] Adjust the HTML/CSS so generated newsletter content sits inside the Serpico preview layout instead of the generic placeholder layout.
+- [x] Verify the file contains the required `mc:edit` regions and run focused project checks.
+- [x] Document results.
+
+## Verification
+
+- [x] Template region check
+- [x] `npm run typecheck`
+
+## Review
+
+- Added `template-HTML` as a Mailchimp Classic coded template with the Serpico logo header, intro, hero, generated body area, divider image, CTA, and footer.
+- Preserved the app's expected editable section names: `preheader`, `intro`, `hero_image`, and `body`.
+- Added body-region styles for the generated newsletter sections/articles so app-created content renders inside the branded preview layout.
+- `npm run typecheck` passed.
+
+---
+
 # Editable Preferences Persistence Audit
 
 ## Plan
