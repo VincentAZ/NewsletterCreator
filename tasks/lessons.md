@@ -1,5 +1,7 @@
 # Lessons
 
+- Do not try to repair a Mailchimp campaign by writing direct `html` after first populating it with `template.sections`; Mailchimp can keep returning the template-rendered HTML. For preview-critical campaigns, choose the direct branded HTML path before the first content write.
+- For Mailchimp template fixes, do not rely only on fixed template rows outside `mc:edit` regions; verify the actual app-populated Mailchimp content path. If fixed rows still disappear in Mailchimp preview, include required persistent elements in the generated section HTML as a fallback.
 - Do not present Mailchimp template visual matching as verified until the HTML has been rendered and inspected against the provided preview screenshot; `mc:edit` checks and typecheck only prove structure, not appearance.
 - Do not assume the original workspace path is still current after the user says they renamed the project folder. Re-discover the active project directory and restart servers from that folder.
 - Do not present optional provider metadata headers as required `.env` setup. For OpenRouter, keep the required setup focused on `OPENROUTER_API_KEY`; only mention `HTTP-Referer`/`X-Title` if the user specifically wants request attribution metadata.

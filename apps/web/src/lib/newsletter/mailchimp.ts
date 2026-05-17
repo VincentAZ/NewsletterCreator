@@ -62,9 +62,6 @@ export async function createMailchimpCampaignDraft(input: {
   image: GeneratedImage;
 }): Promise<MailchimpCampaignDraft> {
   const config = getMailchimpConfig();
-  if (config.template) {
-    await validateMailchimpTemplate(config, config.template.id);
-  }
 
   const title = `${input.draft.subject} - ${new Date().toISOString().slice(0, 10)}`;
 
@@ -207,27 +204,6 @@ async function setCampaignContent(
   draft: NewsletterDraft,
   image: GeneratedImage,
 ) {
-  if (config.template) {
-    await mailchimpFetch(config, `/campaigns/${campaignId}/content`, {
-      method: "PUT",
-      body: JSON.stringify(buildMailchimpCampaignContent(draft, image, config.template)),
-    });
-
-    const templateContent = await mailchimpFetch<MailchimpCampaignContentResponse>(
-      config,
-      `/campaigns/${campaignId}/content`,
-      { method: "GET" },
-    ).catch(() => null);
-
-    if (!templateContent?.html || !hasGeneratedNewsletterContent(templateContent.html, draft)) {
-      throw new Error(
-        `Mailchimp accepted MAILCHIMP_TEMPLATE_ID ${config.template.id}, but did not return previewable HTML with the generated newsletter content. This usually means the template is not a Classic template with matching mc:edit sections.`,
-      );
-    }
-
-    return;
-  }
-
   await mailchimpFetch(config, `/campaigns/${campaignId}/content`, {
     method: "PUT",
     body: JSON.stringify(buildMailchimpCampaignContent(draft, image)),
@@ -237,7 +213,7 @@ async function setCampaignContent(
     method: "GET",
   }).catch(() => null);
 
-  if (!content?.html || !hasGeneratedNewsletterContent(content.html, draft)) {
+  if (!content?.html || !hasGeneratedNewsletterContent(content.html, draft) || !hasPersistentNewsletterContent(content.html)) {
     throw new Error("Mailchimp saved the draft but did not return previewable HTML content. Open the draft in Mailchimp and check the template/content builder.");
   }
 }
@@ -267,6 +243,12 @@ function hasGeneratedNewsletterContent(html: string, draft: NewsletterDraft) {
       ((intro && normalizedHtml.includes(intro.slice(0, 80))) ||
         (firstHeading && normalizedHtml.includes(firstHeading))),
   );
+}
+
+function hasPersistentNewsletterContent(html: string) {
+  const normalizedHtml = normalizeContentText(stripHtmlTags(html));
+
+  return normalizedHtml.includes("explore the learning center") && normalizedHtml.includes("serpico ai learning center") && normalizedHtml.includes("unsubscribe");
 }
 
 function stripHtmlTags(value: string) {
@@ -326,25 +308,52 @@ async function mailchimpFetch<T = unknown>(config: MailchimpConfig, path: string
 
 function renderNewsletterHtml(draft: NewsletterDraft, image: GeneratedImage) {
   return `<!doctype html>
-<html>
-  <body style="margin:0;background:#f6f7f9;color:#1b1f24;font-family:Arial,Helvetica,sans-serif;">
-    <div style="display:none;max-height:0;overflow:hidden;">${escapeHtml(draft.preheader)}</div>
-    <main style="max-width:680px;margin:0 auto;background:#ffffff;padding:28px;">
-      ${renderHeroImageHtml(image, draft.subject)}
-      ${renderIntroHtml(draft)}
-      ${renderSectionsHtml(draft)}
-    </main>
+<html lang="en">
+  <body style="margin:0;padding:0;background:#eef1f5;color:#111827;font-family:Arial,Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;max-width:0;opacity:0;overflow:hidden;">${escapeHtml(draft.preheader)}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;border-collapse:collapse;padding:20px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="720" cellpadding="0" cellspacing="0" style="background:#ffffff;border-collapse:collapse;border-radius:6px;overflow:hidden;">
+            <tr>
+              <td align="center" style="background:#0d1b2e;padding:50px 40px 49px;">
+                <img src="https://mcusercontent.com/<account-id>/images/0ce7f308-4079-72f1-3d96-c66dd291cc4d.png" alt="Serpico AI Learning Center at CEI" width="240" style="border:0;display:block;height:auto;margin:0 auto;max-width:240px;width:240px;" />
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff;padding:38px 48px 39px;">
+                ${renderIntroHtml(draft)}
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff;line-height:0;padding:0;">
+                ${renderHeroImageHtml(image, draft.subject)}
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff;color:#111827;font-family:Arial,Helvetica,sans-serif;padding:35px 48px 20px;">
+                ${renderSectionsHtml(draft)}
+              </td>
+            </tr>
+            ${renderLearningCenterButtonHtml()}
+            ${renderDividerHtml()}
+            ${renderMarketingCtaHtml()}
+            ${renderFooterHtml()}
+          </table>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>`;
 }
 
 function renderIntroHtml(draft: NewsletterDraft) {
-  return `<h1 style="font-size:28px;line-height:1.15;margin:24px 0 10px;">${escapeHtml(draft.subject)}</h1>
-<p style="font-size:16px;line-height:1.55;margin:0 0 24px;">${escapeHtml(draft.intro)}</p>`;
+  return `<h1 style="color:#031126;font-family:Arial,Helvetica,sans-serif;font-size:29px;font-weight:700;line-height:1.1;margin:0 0 10px;">${escapeHtml(draft.subject)}</h1>
+<p style="color:#111827;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.45;margin:0;max-width:560px;">${escapeHtml(draft.intro)}</p>`;
 }
 
 function renderHeroImageHtml(image: GeneratedImage, subject: string) {
-  return `<img src="${escapeAttribute(image.url)}" alt="${escapeAttribute(subject)}" style="border:0;display:block;height:auto;margin:0 0 24px;max-width:100%;width:100%;" />`;
+  return `<img src="${escapeAttribute(image.url)}" alt="${escapeAttribute(subject)}" width="720" style="border:0;display:block;height:auto;margin:0;max-width:720px;width:100%;" />`;
 }
 
 function renderSectionsHtml(draft: NewsletterDraft) {
@@ -367,6 +376,42 @@ function renderSectionsHtml(draft: NewsletterDraft) {
     .join("");
 }
 
+function renderLearningCenterButtonHtml() {
+  return `<tr>
+  <td align="left" style="background:#ffffff;padding:0 48px 44px;">
+    <a href="https://serpicoailc.com" style="background:#3b73e6;border-radius:5px;color:#ffffff;display:inline-block;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;line-height:1.2;min-width:244px;padding:15px 28px;text-align:center;text-decoration:none;">Explore the Learning Center &rarr;</a>
+  </td>
+</tr>`;
+}
+
+function renderDividerHtml() {
+  return `<tr>
+  <td style="background:#0b1424;background-image:linear-gradient(90deg,#021122 0%,#0b4a88 28%,#54b5ff 50%,#5735c8 73%,#031225 100%);height:48px;line-height:0;padding:0;">
+    <img src="https://mcusercontent.com/<account-id>/images/902c0ae4-7495-6b44-c893-a6fffc630e0b.png" alt="" width="720" style="border:0;display:block;height:auto;max-width:720px;width:100%;" />
+  </td>
+</tr>`;
+}
+
+function renderMarketingCtaHtml() {
+  return `<tr>
+  <td align="center" style="background:#0d1b2e;color:#ffffff;font-family:Arial,Helvetica,sans-serif;padding:43px 48px 45px;text-align:center;">
+    <h2 style="color:#ffffff;font-size:31px;font-weight:900;line-height:1.25;margin:0 0 22px;">Solve your business problem in less than a day.</h2>
+    <p style="color:#c7d8ee;font-size:16px;line-height:1.55;margin:0 0 24px;">We begin with a discovery call. We then pair you with the right specialist to help you build a tailored solution for your business.</p>
+    <p style="color:#c7d8ee;font-size:16px;line-height:1.55;margin:0 0 24px;">Not a course. Not merely learning about AI. It's a real, working tool.</p>
+    <a href="https://serpicoailc.com/register" style="background:#f2b334;border-radius:5px;color:#020817;display:inline-block;font-size:16px;font-weight:700;min-width:270px;padding:15px 34px;text-decoration:none;">Reserve Your 1:1 Expert Training</a>
+  </td>
+</tr>`;
+}
+
+function renderFooterHtml() {
+  return `<tr>
+  <td align="center" style="background:#eef1f5;color:#8a929b;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;padding:31px 40px;text-align:center;">
+    <p style="margin:0 0 8px;">&copy; 2026 Serpico AI Learning Center &middot; Phoenix, AZ</p>
+    <p style="margin:0;"><a href="*|UNSUB|*" style="color:#8a929b;text-decoration:underline;">Unsubscribe</a> &middot; <a href="*|UPDATE_PROFILE|*" style="color:#8a929b;text-decoration:underline;">Update Preferences</a></p>
+  </td>
+</tr>`;
+}
+
 function renderNewsletterText(draft: NewsletterDraft) {
   const sectionText = draft.sections
     .map((section) => {
@@ -377,7 +422,7 @@ function renderNewsletterText(draft: NewsletterDraft) {
     })
     .join("\n\n");
 
-  return `${draft.subject}\n\n${draft.preheader}\n\n${draft.intro}\n\n${sectionText}`;
+  return `${draft.subject}\n\n${draft.preheader}\n\n${draft.intro}\n\n${sectionText}\n\nExplore the Learning Center: https://serpicoailc.com\n\nReserve Your 1:1 Expert Training: https://serpicoailc.com/register\n\n© 2026 Serpico AI Learning Center · Phoenix, AZ`;
 }
 
 function escapeHtml(value: string) {

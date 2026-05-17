@@ -137,11 +137,19 @@
       text-align: center;
     }
 
-    .body-block {
+    .body-block,
+    .learning-center-block {
       background-color: #ffffff;
       color: #111827;
       font-family: Arial, Helvetica, sans-serif;
-      padding: 35px 48px 44px;
+    }
+
+    .body-block {
+      padding: 35px 48px 20px;
+    }
+
+    .learning-center-block {
+      padding: 0 48px 44px;
     }
 
     .body-block section {
@@ -193,7 +201,7 @@
       margin-bottom: 0;
     }
 
-    .body-block a.btn {
+    .learning-center-block a.btn {
       background-color: #3b73e6;
       border-radius: 5px;
       color: #ffffff !important;
@@ -295,7 +303,8 @@
       }
 
       .intro-block,
-      .body-block {
+      .body-block,
+      .learning-center-block {
         padding-left: 28px !important;
         padding-right: 28px !important;
       }
@@ -307,6 +316,10 @@
 
       .body-block {
         padding-top: 38px !important;
+        padding-bottom: 28px !important;
+      }
+
+      .learning-center-block {
         padding-bottom: 42px !important;
       }
 
@@ -320,7 +333,7 @@
       }
 
       .cta-block a.cta-btn,
-      .body-block a.btn {
+      .learning-center-block a.btn {
         box-sizing: border-box;
         text-align: center;
         width: 100%;
@@ -359,6 +372,11 @@
             <td class="body-block" mc:edit="body">
               <p>This is your main content area. Share updates, training highlights, or industry insights here. Keep paragraphs short and focused so readers stay engaged all the way through.</p>
               <p>Add a second paragraph if needed, then drive readers toward your call-to-action below.</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="learning-center-block" align="left">
               <a href="https://serpicoailc.com" class="btn">Explore the Learning Center →</a>
             </td>
           </tr>

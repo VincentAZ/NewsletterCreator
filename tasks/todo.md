@@ -1,3 +1,60 @@
+# Fix Missing Mailchimp Populated Button Footer
+
+## Plan
+
+- [x] Capture lesson from the continued missing button/footer after local template verification.
+- [x] Inspect actual app Mailchimp render/template-section path.
+- [x] Add robust generated-content fallback so the Learning Center button and footer appear even when Mailchimp preview replaces fixed template rows.
+- [x] Render and inspect generated populated HTML with fallback.
+- [x] Run focused checks and document results.
+
+## Verification
+
+- [x] Generated populated render inspected
+- [x] Real Mailchimp draft read-back smoke test
+- [x] `npm run typecheck`
+
+## Review
+
+- The old Mailchimp template-section path could return generated content while still omitting the Learning Center button; attempting to rewrite that same template-backed draft with direct HTML did not remove the old template render.
+- Updated `createMailchimpCampaignDraft` / `setCampaignContent` to write complete branded HTML directly from the first content update.
+- Expanded the direct HTML renderer to include the Serpico logo header, generated intro, generated hero image, generated article body, blue "Explore the Learning Center" button, divider, dark CTA, and gray footer.
+- Added persistent-content read-back validation so Mailchimp drafts must contain the generated subject, Learning Center button, and footer/unsubscribe content.
+- Real Mailchimp smoke draft read-back passed with `hasSubject: true`, `hasButton: true`, and `hasFooter: true`; the temporary campaign was deleted.
+- Rendered the actual Mailchimp read-back HTML to `tasks/mailchimp-final-readback-768.png` and visually confirmed the blue button and gray footer are present.
+- `npm run typecheck` passed.
+
+---
+
+# Restore Persistent Mailchimp Footer And Learning Button
+
+## Plan
+
+- [x] Inspect current template and app section replacement behavior.
+- [x] Move "Explore the Learning Center" outside `mc:edit="body"` so app-populated body content cannot replace it.
+- [x] Keep the footer outside all editable regions and verify it remains after simulated Mailchimp section replacement.
+- [x] Render placeholder and simulated populated previews; inspect for button/footer and layout issues.
+- [x] Patch any visual or structural issues found during verification.
+- [x] Re-run editable-region and typecheck checks.
+- [x] Document results.
+
+## Verification
+
+- [x] Placeholder render inspected
+- [x] Simulated populated render inspected
+- [x] Template region check
+- [x] `npm run typecheck`
+
+## Review
+
+- Moved the blue "Explore the Learning Center" button into a fixed `learning-center-block` row outside `mc:edit="body"`, so app-generated article content no longer replaces it.
+- Confirmed the gray footer remains outside all editable Mailchimp regions.
+- Rendered and inspected the placeholder view in `tasks/template-placeholder-768.png`.
+- Rendered and inspected a simulated populated view in `tasks/template-populated-full-768.png`; both the blue Learning Center button and gray footer are visible after body replacement.
+- Final checks passed: persistent button/footer contract, four unique editable regions, and `npm run typecheck`.
+
+---
+
 # Visual Verify Mailchimp Template
 
 ## Plan
