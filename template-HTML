@@ -6,49 +6,61 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Serpico AI :: Daily AI Brief</title>
   <style type="text/css">
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #f0f2f5;
-      font-family: Arial, Helvetica, sans-serif;
+    body,
+    table,
+    td,
+    p,
+    a {
       -webkit-text-size-adjust: 100%;
       -ms-text-size-adjust: 100%;
     }
 
-    table {
-      border-collapse: collapse;
+    table,
+    td {
       mso-table-lspace: 0pt;
       mso-table-rspace: 0pt;
     }
 
+    table {
+      border-collapse: collapse;
+    }
+
     img {
+      -ms-interpolation-mode: bicubic;
       border: 0;
       display: block;
       height: auto;
       line-height: 100%;
-      max-width: 100%;
       outline: none;
       text-decoration: none;
     }
 
+    body {
+      background-color: #eef1f5;
+      margin: 0;
+      padding: 0;
+      width: 100% !important;
+    }
+
     a {
-      color: #0073e6;
+      color: #113a5c;
       text-decoration: none;
     }
 
     .preheader {
-      color: #f0f2f5;
+      color: #eef1f5;
       display: none;
       font-size: 1px;
       line-height: 1px;
       max-height: 0;
       max-width: 0;
+      mso-hide: all;
       opacity: 0;
       overflow: hidden;
     }
 
     .wrapper {
-      background-color: #f0f2f5;
+      background-color: #eef1f5;
       padding: 20px 0;
       width: 100%;
     }
@@ -57,176 +69,200 @@
       background-color: #ffffff;
       border-radius: 6px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      margin: 0 auto;
-      max-width: 600px;
       overflow: hidden;
-      width: 600px;
+      width: 720px;
     }
 
     .logo-header {
       background-color: #0d1b2e;
-      padding: 24px 40px;
+      padding: 50px 40px 49px;
       text-align: center;
     }
 
     .logo-header img {
+      display: inline-block;
       margin: 0 auto;
-      max-width: 400px;
-      width: 400px;
+      max-width: 240px;
+      width: 240px;
     }
 
     .intro-block {
       background-color: #ffffff;
-      padding: 32px 40px 20px;
+      padding: 38px 48px 39px;
+    }
+
+    .intro-block h1,
+    .intro-block h2,
+    .intro-block p {
+      font-family: Arial, Helvetica, sans-serif;
     }
 
     .intro-block h1 {
-      color: #0d1b2e;
-      font-size: 24px;
-      font-weight: 800;
-      line-height: 1.3;
-      margin: 0 0 12px;
-    }
-
-    .intro-block p {
-      color: #555555;
-      font-size: 15px;
-      line-height: 1.7;
+      color: #031126;
+      font-size: 29px;
+      font-weight: 700;
+      line-height: 1.1;
       margin: 0;
     }
 
+    .intro-block p {
+      color: #334155;
+      font-size: 16px;
+      line-height: 1.45;
+      margin: 0;
+      max-width: 500px;
+    }
+
     .hero-block {
+      background-color: #ffffff;
       line-height: 0;
-      width: 100%;
+      padding: 0;
     }
 
     .hero-block img {
       display: block;
-      margin: 0;
+      height: auto;
+      margin: 0 auto;
       max-width: 600px;
       width: 100%;
     }
 
     .hero-placeholder {
-      background-color: #ddeeff;
-      color: #0073e6;
-      font-size: 14px;
-      line-height: 1.5;
-      padding: 60px 40px;
+      background-color: #ddecff;
+      color: #2563eb;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 16px;
+      line-height: 1.4;
+      padding: 53px 40px 52px;
       text-align: center;
     }
 
     .body-block {
-      padding: 28px 40px 36px;
-    }
-
-    .body-block p {
-      color: #444444;
-      font-size: 15px;
-      line-height: 1.7;
-      margin: 0 0 15px;
+      background-color: #ffffff;
+      color: #111827;
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 35px 48px 44px;
     }
 
     .body-block section {
-      border-top: 1px solid #d9e0e5;
-      margin: 22px 0 0;
-      padding: 22px 0 0;
+      border-top: 1px solid #d6dde5;
+      margin: 0 0 0;
+      padding: 28px 0 0;
     }
 
-    .body-block section:first-child {
-      border-top: 0;
-      margin-top: 0;
-      padding-top: 0;
+    .body-block section + section {
+      margin-top: 28px;
     }
 
     .body-block h2 {
-      color: #0d1b2e;
+      color: #000000;
       font-size: 21px;
-      font-weight: 800;
+      font-weight: 700;
       line-height: 1.25;
-      margin: 0 0 8px;
+      margin: 0 0 10px;
     }
 
     .body-block h3 {
-      color: #0d1b2e;
+      color: #0d2a43;
       font-size: 16px;
       font-weight: 700;
-      line-height: 1.35;
-      margin: 0 0 6px;
+      line-height: 1.3;
+      margin: 0 0 7px;
+    }
+
+    .body-block h3 a {
+      color: #0d2a43;
+      font-weight: 700;
+    }
+
+    .body-block p {
+      color: #1f2937;
+      font-size: 16px;
+      line-height: 1.65;
+      margin: 0 0 20px;
     }
 
     .body-block article {
       margin: 0 0 18px;
     }
 
-    .body-block article p {
-      font-size: 14px;
-      line-height: 1.55;
-      margin: 0 0 6px;
-    }
-
-    .body-block strong {
-      color: #0d1b2e;
+    .body-block article p:last-child {
+      color: #475569;
+      font-size: 13px;
+      line-height: 1.45;
+      margin-bottom: 0;
     }
 
     .body-block a.btn {
-      background-color: #0073e6;
+      background-color: #3b73e6;
       border-radius: 5px;
       color: #ffffff !important;
       display: inline-block;
-      font-size: 15px;
-      font-weight: bold;
-      margin-top: 8px;
-      padding: 13px 30px;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-top: 2px;
+      min-width: 244px;
+      padding: 15px 28px;
+      text-align: center;
     }
 
     .divider-block {
+      background-color: #0b1424;
+      background-image: linear-gradient(90deg, #021122 0%, #0b4a88 28%, #54b5ff 50%, #5735c8 73%, #031225 100%);
+      height: 48px;
       line-height: 0;
-      width: 100%;
+      padding: 0;
     }
 
     .divider-block img {
+      display: block;
+      height: auto;
+      max-width: 720px;
       width: 100%;
     }
 
     .cta-block {
       background-color: #0d1b2e;
-      padding: 36px 40px;
+      color: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 43px 48px 45px;
       text-align: center;
     }
 
     .cta-block h2 {
       color: #ffffff;
-      font-size: 28px;
+      font-size: 31px;
       font-weight: 900;
-      line-height: 1.3;
-      margin: 0 0 16px;
+      line-height: 1.25;
+      margin: 0 0 22px;
     }
 
     .cta-block p {
-      color: #a8bdd0;
-      font-size: 15px;
-      font-weight: 400;
-      line-height: 1.7;
+      color: #c7d8ee;
+      font-size: 16px;
+      line-height: 1.55;
       margin: 0 0 24px;
     }
 
     .cta-block a.cta-btn {
-      background-color: #f5a623;
+      background-color: #f2b334;
       border-radius: 5px;
-      color: #0d1b2e !important;
+      color: #020817 !important;
       display: inline-block;
-      font-size: 15px;
-      font-weight: bold;
-      padding: 13px 32px;
+      font-size: 16px;
+      font-weight: 700;
+      min-width: 270px;
+      padding: 15px 34px;
     }
 
     .footer {
-      background-color: #f0f2f5;
-      color: #999999;
+      background-color: #eef1f5;
+      color: #8a929b;
+      font-family: Arial, Helvetica, sans-serif;
       font-size: 12px;
-      line-height: 1.5;
-      padding: 20px 40px;
+      line-height: 1.6;
+      padding: 31px 40px 31px;
       text-align: center;
     }
 
@@ -235,7 +271,7 @@
     }
 
     .footer a {
-      color: #999999;
+      color: #8a929b;
       text-decoration: underline;
     }
 
@@ -245,83 +281,91 @@
       }
 
       .container {
-        border-radius: 0;
+        border-radius: 0 !important;
         width: 100% !important;
       }
 
-      .logo-header,
-      .intro-block,
-      .body-block,
-      .cta-block,
-      .footer {
-        padding-left: 22px !important;
-        padding-right: 22px !important;
+      .logo-header {
+        padding: 38px 24px !important;
       }
 
       .logo-header img {
-        max-width: 280px !important;
-        width: 100% !important;
+        max-width: 220px !important;
+        width: 220px !important;
       }
 
+      .intro-block,
+      .body-block {
+        padding-left: 28px !important;
+        padding-right: 28px !important;
+      }
+
+      .intro-block {
+        padding-top: 34px !important;
+        padding-bottom: 34px !important;
+      }
+
+      .body-block {
+        padding-top: 38px !important;
+        padding-bottom: 42px !important;
+      }
+
+      .intro-block h1,
       .cta-block h2 {
-        font-size: 24px !important;
+        font-size: 26px !important;
+      }
+
+      .cta-block {
+        padding: 36px 28px 42px !important;
+      }
+
+      .cta-block a.cta-btn,
+      .body-block a.btn {
+        box-sizing: border-box;
+        text-align: center;
+        width: 100%;
       }
     }
   </style>
 </head>
 <body>
   <div class="preheader" mc:edit="preheader">
-    Your daily AI brief from Serpico AI Learning Center.
+    Today's AI brief from Serpico AI Learning Center.
   </div>
 
-  <table class="wrapper" width="100%" cellpadding="0" cellspacing="0" role="presentation">
+  <table role="presentation" class="wrapper" width="100%" cellpadding="0" cellspacing="0">
     <tr>
       <td align="center">
-        <table class="container" width="600" cellpadding="0" cellspacing="0" role="presentation">
+        <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0">
           <tr>
-            <td class="logo-header">
-              <img src="https://mcusercontent.com/<account-id>/images/0ce7f308-4079-72f1-3d96-c66dd291cc4d.png" alt="Serpico AI Learning Center" width="400">
+            <td class="logo-header" align="center">
+              <img src="https://mcusercontent.com/<account-id>/images/0ce7f308-4079-72f1-3d96-c66dd291cc4d.png" alt="Serpico AI Learning Center at CEI" width="240">
             </td>
           </tr>
 
           <tr>
-            <td class="intro-block">
-              <div mc:edit="intro">
-                <h1>Daily AI Brief</h1>
-                <p>Today's curated AI updates, training highlights, and practical signals for business leaders.</p>
-              </div>
+            <td class="intro-block" mc:edit="intro">
+              <h1>Stay Ahead of the AI Curve 🚀</h1>
             </td>
           </tr>
 
           <tr>
-            <td class="hero-block">
-              <div mc:edit="hero_image">
-                <div class="hero-placeholder">
-                  Insert hero image here. Recommended size: 600 x 300 px.
-                </div>
-              </div>
+            <td class="hero-block" mc:edit="hero_image">
+              <div class="hero-placeholder">[ Insert hero image here -- recommended: 600 x 300px ]</div>
             </td>
           </tr>
 
           <tr>
-            <td class="body-block">
-              <div mc:edit="body">
-                <section>
-                  <h2>AI News That Matters</h2>
-                  <p>A concise overview of the most useful AI developments for today's newsletter.</p>
-                  <article>
-                    <h3><a href="https://serpicoailc.com">Example story headline</a></h3>
-                    <p>Use this area for generated article summaries from the app.</p>
-                    <p><strong>Why it matters:</strong> Connect the story to business value, learning opportunities, or implementation risk.</p>
-                  </article>
-                </section>
-              </div>
+            <td class="body-block" mc:edit="body">
+              <p>This is your main content area. Share updates, training highlights, or industry insights here. Keep paragraphs short and focused so readers stay engaged all the way through.</p>
+              <p>Add a second paragraph if needed, then drive readers toward your call-to-action below.</p>
+              <a href="https://serpicoailc.com" class="btn">Explore the Learning Center →</a>
             </td>
           </tr>
 
           <tr>
             <td class="divider-block">
-              <img src="https://mcusercontent.com/<account-id>/images/902c0ae4-7495-6b44-c893-a6fffc630e0b.png" alt="" width="600">
+              <img src="https://mcusercontent.com/<account-id>/images/902c0ae4-7495-6b44-c893-a6fffc630e0b.png" alt="" width="720">
             </td>
           </tr>
 
@@ -329,16 +373,16 @@
             <td class="cta-block">
               <h2>Solve your business problem in less than a day.</h2>
               <p>We begin with a discovery call. We then pair you with the right specialist to help you build a tailored solution for your business.</p>
-              <p>Not a course. Not merely learning about AI. It is a real, working tool.</p>
+              <p>Not a course. Not merely learning about AI. It's a real, working tool.</p>
               <a href="https://serpicoailc.com/register" class="cta-btn">Reserve Your 1:1 Expert Training</a>
             </td>
           </tr>
 
           <tr>
             <td class="footer">
-              <p>&copy; 2026 Serpico AI Learning Center &middot; Phoenix, AZ</p>
+              <p>© 2026 Serpico AI Learning Center · Phoenix, AZ</p>
               <p>
-                <a href="*|UNSUB|*">Unsubscribe</a> &middot;
+                <a href="*|UNSUB|*">Unsubscribe</a> ·
                 <a href="*|UPDATE_PROFILE|*">Update Preferences</a>
               </p>
             </td>

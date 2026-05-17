@@ -1,3 +1,78 @@
+# Visual Verify Mailchimp Template
+
+## Plan
+
+- [x] Capture the verification lesson after the user pointed out the missing rendered comparison.
+- [x] Render `template-HTML` locally at the same 768px-wide screenshot context as the attached template.
+- [x] Inspect the rendered screenshot against the attached template for header, footer, body CTA, hero, and CTA block differences.
+- [x] Patch spacing/content if the rendered output is visibly off.
+- [x] Re-run template-region and typecheck verification.
+- [x] Document visual verification results.
+
+## Verification
+
+- [x] Local rendered screenshot inspected
+- [x] Template region check
+- [x] `npm run typecheck`
+
+## Review
+
+- Rendered `template-HTML` through headless Chrome using a temporary `.html` copy and saved the inspected output to `tasks/template-render-768.png`.
+- Initial render showed the layout was too narrow versus the provided 768px screenshot, so the template container was widened to 720px and spacing was retuned.
+- Body fallback now visually matches the placeholder structure more closely: left-aligned text, centered text inside the blue "Explore the Learning Center" button, matching body gutters, and a divider/CTA/footer flow close to the attached template.
+- Local Chrome could not load the remote Mailchimp-hosted logo/divider assets in this sandbox, so the screenshot uses a visible gradient fallback for the divider and a broken remote-logo placeholder. In Mailchimp, those hosted images should load normally.
+- Re-verified the four unique editable regions and ran `npm run typecheck`.
+
+---
+
+# Match Mailchimp Placeholder Preview
+
+## Plan
+
+- [x] Re-read the current `template-HTML` and prior task notes.
+- [x] Adjust fallback/default content so the Mailchimp template preview matches the attached placeholder: headline only, centered placeholder hero, two body paragraphs, centered blue button, matching header/footer/CTA spacing.
+- [x] Keep the app-compatible `mc:edit` regions unchanged.
+- [x] Verify editable regions and run `npm run typecheck`.
+- [x] Document results.
+
+## Verification
+
+- [x] Template region check
+- [x] `npm run typecheck`
+
+## Review
+
+- Updated `template-HTML` fallback content to match the placeholder preview: headline-only intro, centered hero placeholder, two body paragraphs, and the centered blue "Explore the Learning Center" button.
+- Tuned header/logo sizing, body padding, CTA spacing, CTA button width, and footer sizing to better match the attached template screenshot.
+- Preserved the four app-populated Mailchimp Classic editable regions: `preheader`, `intro`, `hero_image`, and `body`.
+- Verified the editable-region contract and ran `npm run typecheck`.
+
+---
+
+# Fix Preview-Matched Mailchimp Template
+
+## Plan
+
+- [x] Read current `template-HTML`, app Mailchimp rendering code, and existing project lessons.
+- [x] Check current Mailchimp template-language docs for editable-region constraints.
+- [x] Replace `template-HTML` with a Classic coded template that matches the supplied preview and app-generated content shape.
+- [x] Verify required `mc:edit` regions are present and not nested.
+- [x] Run focused project checks and document the result.
+
+## Verification
+
+- [x] Template region check
+- [x] `npm run typecheck`
+
+## Review
+
+- Reworked `template-HTML` into a Mailchimp Classic coded template aligned with the supplied preview: taller navy logo header, generated-newsletter intro, full-width hero area, section/article body styling, divider image, dark CTA block, and muted footer.
+- Moved the app-populated regions onto container elements with exactly the expected unique names: `preheader`, `intro`, `hero_image`, and `body`.
+- Kept the hero region as a container so the app can inject its generated image HTML through the Mailchimp campaign-content API.
+- Verified the editable-region contract and ran `npm run typecheck`.
+
+---
+
 # Mailchimp Preview-Matched Template HTML
 
 ## Plan
