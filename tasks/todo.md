@@ -1,3 +1,59 @@
+# Simplify Prompt Saves And Scrape Model Display
+
+## Plan
+
+- [x] Capture lessons from the confusing prompt-save UI and inconsistent scrape model display.
+- [x] Update AI scrape model select so it shows the saved model ID before model catalogs load, like copy and image.
+- [x] Remove the saved-prompt profile block from the top Models section.
+- [x] Add a compact Save button beside each of the six prompt fields.
+- [x] Wire each Save button to persist current prompt preferences immediately.
+- [x] Run typecheck/build and a rendered UI smoke check.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] Local dashboard smoke check
+- [ ] `npm run build`
+
+## Review
+
+- Fixed the scrape model dropdown so the saved/default model ID is present before OpenRouter models are loaded, instead of showing only "Load models first".
+- Removed the large Saved prompts / Prompt name / Save prompt / New prompt block from the Models section.
+- Added one compact Save button beside each of the six prompt fields.
+- Each Save button persists the current prompt preference payload immediately through the existing preferences API path.
+- Local dashboard smoke check returned HTTP 200 on the existing dev server at `http://127.0.0.1:3000`; the removed prompt manager labels were absent, all six prompt labels were present once, and there were six Save buttons.
+- `npm run typecheck` passed.
+- `npm run build` was attempted but hit the known Windows `.next` `EPERM` cleanup lock while the user-owned Next dev server was running on port 3000, so the server was left alone.
+
+---
+
+# Move Model And Prompt Controls To Models Section
+
+## Plan
+
+- [x] Locate dashboard state, preference payloads, and JSX for scrape, copy, and image model/prompt controls.
+- [x] Move all model selectors and system/task prompt editors into the top Models section in this order: scrape model and prompt, copy model and prompt, image model and prompt.
+- [x] Remove duplicate prompt/model controls from Source Queue, Draft Review, and Hero Image workflow cards while preserving saved prompt set controls.
+- [x] Verify preference load/save still includes every moved editable field.
+- [x] Run typecheck/build verification and inspect the rendered UI structure.
+
+## Verification
+
+- [x] Preference wiring checked
+- [x] `npm run typecheck`
+- [x] Local dashboard HTTP smoke test at `http://127.0.0.1:3001`
+- [x] `npm run build`
+
+## Review
+
+- Moved saved prompt controls plus scrape, copy, and image model/prompt editors into the top Models section.
+- Kept the requested order: scrape model and prompts, copy model and prompts, image model and prompts.
+- Removed duplicate prompt/model editors from Source Queue, Draft Review, and Hero Image while leaving workflow-specific feedback fields in their original cards.
+- Rendered dashboard HTML showed each moved label exactly once and in the expected order.
+- The first build hit the known Windows `.next` `EPERM` cleanup issue; after stopping the temporary dev server and clearing generated `.next` read-only attributes, `npm run build` passed.
+
+---
+
 # Fix Missing Mailchimp Populated Button Footer
 
 ## Plan

@@ -30,3 +30,5 @@
 - Before clearing generated `.next` output on Windows, stop all Next dev/build processes for this repo. A live dev server can leave `.next/dev` metadata partially deleted and cause missing `app-paths-manifest.json` 500s.
 - When the user is running `npm run dev` in their own terminal, do not leave a Codex-started background Next dev server running on the same repo/port. Stop Codex-owned dev servers after verification unless the user explicitly wants it kept alive.
 - For NewsletterCreator preferences, every user-editable control must be included in the database-backed preference payload and reload path. Treat autosave ordering as part of persistence correctness; stale save responses must not be allowed to overwrite newer edits.
+- When moving model selectors into a shared toolbar, keep unloaded-catalog display behavior consistent across selectors; saved IDs should remain visible before the catalog loads.
+- Do not expose prompt profile management when the user only needs straightforward prompt persistence. Prefer local save controls beside each editable prompt field.

@@ -16,7 +16,6 @@ import type {
   ValidationResult,
 } from "@/lib/newsletter/types";
 import {
-  createDefaultPromptSet,
   defaultCopySystemPrompt,
   defaultCopyTaskPrompt,
   defaultImageTaskPrompt,
@@ -112,7 +111,7 @@ const emptySourceDraft: NewsSource = {
 
 const helpText = {
   models:
-    "Click Load models to populate the copy, AI scrape, and image model selectors. The selected models are saved as preferences.",
+    "Click Load models to populate the scrape, copy, and image model selectors. Models and workflow prompts are saved as preferences.",
   sourceQueue:
     "Click Load models first to choose an AI scrape model, then click Gather news to fetch and dedupe articles from active sources.",
   sources:
@@ -654,69 +653,14 @@ export function NewsletterDashboard() {
     return section?.feedback ?? "";
   }
 
-  async function savePromptSet() {
-    const promptSet = buildCurrentPromptSet({
-      id: selectedPromptSetId || crypto.randomUUID(),
-      name: promptSetName,
-      scrapeSystemPrompt,
-      scrapeTaskPrompt,
-      copySystemPrompt,
-      copyTaskPrompt,
-      imageSystemPrompt,
-      imageTaskPrompt,
-    });
-    const nextPromptSets = upsertPromptSet(promptSets, promptSet);
-
-    setPromptSets(nextPromptSets);
-    setSelectedPromptSetId(promptSet.id);
-    setPromptSetName(promptSet.name);
-    setStatus("Saving prompt set.");
-
+  async function savePrompt(label: string) {
+    setStatus(`Saving ${label}.`);
     try {
-      await persistPreferencesNow({
-        currentPromptSet: promptSet,
-        promptSets: nextPromptSets,
-        lastPromptSetId: promptSet.id,
-      });
+      await persistPreferencesNow({ currentPromptSet });
+      setStatus(`${label} saved.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Prompt set save failed.");
+      setStatus(error instanceof Error ? error.message : `${label} save failed.`);
     }
-  }
-
-  function newPromptSet() {
-    const promptSet = createDefaultPromptSet();
-    setSelectedPromptSetId("");
-    setPromptSetName(promptSet.name);
-    setScrapeSystemPrompt(promptSet.scrapeSystemPrompt);
-    setScrapeTaskPrompt(promptSet.scrapeTaskPrompt);
-    setCopySystemPrompt(promptSet.copySystemPrompt);
-    setCopyTaskPrompt(promptSet.copyTaskPrompt);
-    setImageSystemPrompt(promptSet.imageSystemPrompt);
-    setImageTaskPrompt(promptSet.imageTaskPrompt);
-    setStatus("Started a new unsaved prompt set.");
-  }
-
-  function selectPromptSet(promptSetId: string) {
-    const promptSet = findPromptSet(promptSets, promptSetId);
-    if (!promptSet) {
-      setSelectedPromptSetId("");
-      return;
-    }
-
-    applyPromptSetState(promptSet, {
-      setSelectedPromptSetId,
-      setPromptSetName,
-      setScrapeSystemPrompt,
-      setScrapeTaskPrompt,
-      setCopySystemPrompt,
-      setCopyTaskPrompt,
-      setImageSystemPrompt,
-      setImageTaskPrompt,
-    });
-    setStatus(`Loaded prompt set: ${promptSet.name}.`);
-    void persistPreferencesNow({ currentPromptSet: promptSet, lastPromptSetId: promptSet.id }).catch((error) => {
-      setStatus(error instanceof Error ? error.message : "Last used prompt save failed.");
-    });
   }
 
   async function persistPreferencesNow(overrides: Partial<{
@@ -762,7 +706,7 @@ export function NewsletterDashboard() {
     }
 
     lastSavedPreferences.current = serializePreferences(preferences);
-    setStatus("Prompt set saved.");
+    setStatus("Preferences saved.");
   }
 
   return (
@@ -782,10 +726,61 @@ export function NewsletterDashboard() {
         <div className="toolbarIntro">
           <div>
             <h2>Models</h2>
-            <span>Copy and image setup</span>
+            <span>Scrape, copy, and image setup</span>
           </div>
           <HelpButton label="Models help">{helpText.models}</HelpButton>
         </div>
+
+        <div className="modelControl">
+          <label>
+            Search scrape models
+            <input
+              value={scrapeModelSearch}
+              onChange={(event) => setScrapeModelSearch(event.target.value)}
+              placeholder="Model name or id"
+              disabled={openRouterModels.length === 0}
+            />
+          </label>
+          <div className="modelOptionField">
+            <span className="modelOptionLabel">AI scrape model</span>
+            <ModelSelect
+              models={filteredScrapeModels}
+              selectedId={scrapeModel}
+              onSelect={setScrapeModel}
+              disabled={openRouterModels.length === 0}
+              selectedModel={selectedScrapeModel}
+              emptyLabel={
+                openRouterModels.length === 0
+                  ? "Load models first"
+                  : "No scrape models match this search."
+              }
+            />
+          </div>
+          <ModelCapabilities model={selectedScrapeModel} emptyLabel="Load models to inspect scrape capabilities." />
+          <span className="fieldHint">
+            {openRouterModels.length > 0
+              ? `${filteredScrapeModels.length}/${openRouterModels.length} OpenRouter scrape models shown. Your choice is saved.`
+              : "Click Load models to choose the OpenRouter model used for AI website scraping."}
+          </span>
+          <PromptField
+            label="AI scrape system prompt"
+            value={scrapeSystemPrompt}
+            onChange={setScrapeSystemPrompt}
+            placeholder={defaultScrapeSystemPrompt}
+            onSave={() => void savePrompt("AI scrape system prompt")}
+            disabled={isBusy}
+          />
+          <PromptField
+            label="AI scrape task prompt"
+            value={scrapeTaskPrompt}
+            onChange={setScrapeTaskPrompt}
+            placeholder={defaultScrapeTaskPrompt}
+            onSave={() => void savePrompt("AI scrape task prompt")}
+            disabled={isBusy}
+            large
+          />
+        </div>
+
         <div className="modelControl">
           <label>
             Search copy models
@@ -809,6 +804,23 @@ export function NewsletterDashboard() {
             </select>
           </label>
           <ModelCapabilities model={selectedCopyModel} emptyLabel="Load models to inspect copy capabilities." />
+          <PromptField
+            label="Copy system prompt"
+            value={copySystemPrompt}
+            onChange={setCopySystemPrompt}
+            placeholder={defaultCopySystemPrompt}
+            onSave={() => void savePrompt("Copy system prompt")}
+            disabled={isBusy}
+          />
+          <PromptField
+            label="Copy task prompt"
+            value={copyTaskPrompt}
+            onChange={setCopyTaskPrompt}
+            placeholder={defaultCopyTaskPrompt}
+            onSave={() => void savePrompt("Copy task prompt")}
+            disabled={isBusy}
+            large
+          />
         </div>
         <div className="modelControl">
           <label>
@@ -833,6 +845,23 @@ export function NewsletterDashboard() {
             </select>
           </label>
           <ModelCapabilities model={selectedImageModel} emptyLabel="Load models to inspect image capabilities." />
+          <PromptField
+            label="Image system prompt"
+            value={imageSystemPrompt}
+            onChange={setImageSystemPrompt}
+            placeholder={defaultImageSystemPrompt}
+            onSave={() => void savePrompt("Image system prompt")}
+            disabled={isBusy}
+          />
+          <PromptField
+            label="Image task prompt"
+            value={imageTaskPrompt}
+            onChange={setImageTaskPrompt}
+            placeholder={defaultImageTaskPrompt}
+            onSave={() => void savePrompt("Image task prompt")}
+            disabled={isBusy}
+            large
+          />
         </div>
         <div className="toolbarActions">
           <button type="button" onClick={loadModels} disabled={isBusy}>
@@ -840,7 +869,7 @@ export function NewsletterDashboard() {
           </button>
           <span>
             {openRouterModels.length + falModels.length > 0
-              ? `${filteredOpenRouterModels.length}/${openRouterModels.length} copy, ${filteredFalModels.length}/${falModels.length} image`
+              ? `${filteredScrapeModels.length}/${openRouterModels.length} scrape, ${filteredOpenRouterModels.length}/${openRouterModels.length} copy, ${filteredFalModels.length}/${falModels.length} image`
               : "No model catalogs loaded"}
           </span>
         </div>
@@ -867,59 +896,6 @@ export function NewsletterDashboard() {
             <span>
               <strong>{selectedArticles.length}</strong> of {articles.length} articles selected
             </span>
-          </div>
-
-          <div className={`scrapeSettings ${openRouterModels.length > 0 ? "loaded" : ""}`}>
-            <div className="modelControl">
-              <label>
-                Search scrape models
-                <input
-                  value={scrapeModelSearch}
-                  onChange={(event) => setScrapeModelSearch(event.target.value)}
-                  placeholder="Model name or id"
-                  disabled={openRouterModels.length === 0}
-                />
-              </label>
-              <div className="modelOptionField">
-                <span className="modelOptionLabel">AI scrape model</span>
-                <ModelSelect
-                  models={filteredScrapeModels}
-                  selectedId={openRouterModels.length > 0 ? scrapeModel : ""}
-                  onSelect={setScrapeModel}
-                  disabled={openRouterModels.length === 0}
-                  selectedModel={selectedScrapeModel}
-                  emptyLabel={
-                    openRouterModels.length === 0
-                      ? "Load models first"
-                      : "No scrape models match this search."
-                  }
-                />
-              </div>
-              <ModelCapabilities model={selectedScrapeModel} emptyLabel="Load models to inspect scrape capabilities." />
-              <span className="fieldHint">
-                {openRouterModels.length > 0
-                  ? `${filteredScrapeModels.length}/${openRouterModels.length} OpenRouter scrape models shown. Your choice is saved.`
-                  : "Click Load models to choose the OpenRouter model used for AI website scraping."}
-              </span>
-            </div>
-            <label className="fieldBlock compact">
-              AI scrape system prompt
-              <textarea
-                className="systemPromptInput"
-                value={scrapeSystemPrompt}
-                onChange={(event) => setScrapeSystemPrompt(event.target.value)}
-                placeholder={defaultScrapeSystemPrompt}
-              />
-            </label>
-            <label className="fieldBlock compact">
-              AI scrape task prompt
-              <textarea
-                className="systemPromptInput large"
-                value={scrapeTaskPrompt}
-                onChange={(event) => setScrapeTaskPrompt(event.target.value)}
-                placeholder={defaultScrapeTaskPrompt}
-              />
-            </label>
           </div>
 
           <section className="sourceManager">
@@ -1192,52 +1168,6 @@ export function NewsletterDashboard() {
             </button>
           </div>
 
-          <div className="promptLibrary">
-            <label>
-              Saved prompts
-              <select value={selectedPromptSetId} onChange={(event) => selectPromptSet(event.target.value)}>
-                <option value="">{promptSets.length > 0 ? "Unsaved prompt set" : "No saved prompt sets"}</option>
-                {promptSets.map((promptSet) => (
-                  <option key={promptSet.id} value={promptSet.id}>
-                    {promptSet.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Prompt name
-              <input value={promptSetName} onChange={(event) => setPromptSetName(event.target.value)} />
-            </label>
-            <div className="promptLibraryActions">
-              <button type="button" onClick={() => void savePromptSet()} disabled={isBusy}>
-                Save prompt
-              </button>
-              <button type="button" className="ghost" onClick={newPromptSet} disabled={isBusy}>
-                New prompt
-              </button>
-            </div>
-          </div>
-
-          <label className="fieldBlock">
-            Copy system prompt
-            <textarea
-              className="systemPromptInput"
-              value={copySystemPrompt}
-              onChange={(event) => setCopySystemPrompt(event.target.value)}
-              placeholder={defaultCopySystemPrompt}
-            />
-          </label>
-
-          <label className="fieldBlock">
-            Copy task prompt
-            <textarea
-              className="systemPromptInput large"
-              value={copyTaskPrompt}
-              onChange={(event) => setCopyTaskPrompt(event.target.value)}
-              placeholder={defaultCopyTaskPrompt}
-            />
-          </label>
-
           <label className="fieldBlock">
             Whole-newsletter feedback
             <textarea
@@ -1323,26 +1253,6 @@ export function NewsletterDashboard() {
               Generate image
             </button>
           </div>
-
-          <label className="fieldBlock">
-            Image system prompt
-            <textarea
-              className="systemPromptInput"
-              value={imageSystemPrompt}
-              onChange={(event) => setImageSystemPrompt(event.target.value)}
-              placeholder={defaultImageSystemPrompt}
-            />
-          </label>
-
-          <label className="fieldBlock">
-            Image task prompt
-            <textarea
-              className="systemPromptInput large"
-              value={imageTaskPrompt}
-              onChange={(event) => setImageTaskPrompt(event.target.value)}
-              placeholder={defaultImageTaskPrompt}
-            />
-          </label>
 
           {draft ? (
             <label className="fieldBlock">
@@ -1525,10 +1435,10 @@ function ModelSelect({
       disabled={disabled}
       aria-label="AI scrape model"
     >
-      {disabled || models.length === 0 ? <option value="">{emptyLabel}</option> : null}
       {selectedId && !hasSelectedOption ? (
         <option value={selectedId}>{selectedModel?.name ?? selectedId}</option>
       ) : null}
+      {(disabled || models.length === 0) && !selectedId ? <option value="">{emptyLabel}</option> : null}
       {models.map((model) => (
         <option key={model.id} value={model.id}>
           {model.name}
@@ -1574,6 +1484,41 @@ function DraftTextField({
       {label}
       {multiline ? <textarea value={value} onChange={handleChange} /> : <input value={value} onChange={handleChange} />}
     </label>
+  );
+}
+
+function PromptField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  onSave,
+  disabled,
+  large = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  onSave: () => void;
+  disabled: boolean;
+  large?: boolean;
+}) {
+  return (
+    <div className="fieldBlock compact promptField">
+      <div className="promptFieldHeader">
+        <span>{label}</span>
+        <button type="button" className="smallSaveButton" onClick={onSave} disabled={disabled}>
+          Save
+        </button>
+      </div>
+      <textarea
+        className={`systemPromptInput ${large ? "large" : ""}`}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
+    </div>
   );
 }
 
@@ -1708,11 +1653,6 @@ function buildCurrentPromptSet(input: {
     imageTaskPrompt: input.imageTaskPrompt,
     updatedAt: input.updatedAt || new Date().toISOString(),
   };
-}
-
-function upsertPromptSet(promptSets: PromptSet[], promptSet: PromptSet) {
-  const next = promptSets.filter((current) => current.id !== promptSet.id);
-  return [promptSet, ...next].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 function findPromptSet(promptSets: PromptSet[], promptSetId?: string) {
