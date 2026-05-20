@@ -106,7 +106,7 @@ function getMailchimpConfig(): MailchimpConfig {
   const listId = process.env.MAILCHIMP_LIST_ID;
   const server = process.env.MAILCHIMP_SERVER || apiKey?.split("-").at(-1);
   const fromName = process.env.MAILCHIMP_FROM_NAME?.trim();
-  const replyTo = process.env.MAILCHIMP_REPLY_TO?.trim();
+  const replyTo = normalizeMailchimpReplyTo(process.env.MAILCHIMP_REPLY_TO);
   const templateId = parseMailchimpTemplateId(process.env.MAILCHIMP_TEMPLATE_ID);
 
   if (!apiKey) {
@@ -157,6 +157,20 @@ function parseMailchimpTemplateId(value: string | undefined) {
   }
 
   return templateId;
+}
+
+export function normalizeMailchimpReplyTo(value: string | undefined) {
+  const trimmed = value?.trim().replace(/^["']|["']$/g, "");
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const assignmentPrefix = "MAILCHIMP_REPLY_TO=";
+  if (trimmed.startsWith(assignmentPrefix)) {
+    return trimmed.slice(assignmentPrefix.length).trim().replace(/^["']|["']$/g, "");
+  }
+
+  return trimmed;
 }
 
 export function buildMailchimpCampaignContent(

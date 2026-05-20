@@ -1219,6 +1219,33 @@
 
 ---
 
+# Mailchimp Reply-To Value Fix
+
+## Plan
+
+- [x] Confirm what the validation error means.
+- [x] Check the local `.env` value for `MAILCHIMP_REPLY_TO`.
+- [x] Normalize pasted `MAILCHIMP_REPLY_TO=value` reply-to values in Mailchimp config.
+- [x] Clarify setup docs so UI email fields receive only the address.
+- [x] Run typecheck and targeted config verification.
+- [x] Document results.
+
+## Verification
+
+- [x] `npm run typecheck`
+- [x] Targeted Mailchimp reply-to normalization smoke test
+
+## Review
+
+- The screenshot error means an email field was given `MAILCHIMP_REPLY_TO=info@example.com` instead of just `info@example.com`; the `=` makes the username part invalid.
+- Confirmed the local `.env` already has the correct `MAILCHIMP_REPLY_TO=info@example.com` assignment format.
+- Added Mailchimp config normalization so the app accepts a pasted `MAILCHIMP_REPLY_TO=value` value and sends only the email address to Mailchimp.
+- Clarified the README setup note: UI email fields should receive only the address, not the env assignment.
+- `npm run typecheck` passed.
+- A targeted compiled helper smoke test confirmed both `MAILCHIMP_REPLY_TO=info@example.com` and `info@example.com` normalize to `info@example.com`.
+
+---
+
 ## Plan
 
 - [x] Review the current final approval/export surface and Mailchimp API requirements.
