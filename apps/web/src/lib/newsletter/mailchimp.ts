@@ -393,7 +393,7 @@ function renderSectionsHtml(draft: NewsletterDraft) {
 function renderLearningCenterButtonHtml() {
   return `<tr>
   <td align="left" style="background:#ffffff;padding:0 48px 44px;">
-    <a href="https://serpicoailc.com" style="background:#3b73e6;border-radius:5px;color:#ffffff;display:inline-block;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;line-height:1.2;min-width:244px;padding:15px 28px;text-align:center;text-decoration:none;">Explore the Learning Center &rarr;</a>
+    <a href="https://www.example.com" style="background:#3b73e6;border-radius:5px;color:#ffffff;display:inline-block;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;line-height:1.2;min-width:244px;padding:15px 28px;text-align:center;text-decoration:none;">Explore the Learning Center &rarr;</a>
   </td>
 </tr>`;
 }
@@ -412,7 +412,7 @@ function renderMarketingCtaHtml() {
     <h2 style="color:#ffffff;font-size:31px;font-weight:900;line-height:1.25;margin:0 0 22px;">Solve your business problem in less than a day.</h2>
     <p style="color:#c7d8ee;font-size:16px;line-height:1.55;margin:0 0 24px;">We begin with a discovery call. We then pair you with the right specialist to help you build a tailored solution for your business.</p>
     <p style="color:#c7d8ee;font-size:16px;line-height:1.55;margin:0 0 24px;">Not a course. Not merely learning about AI. It's a real, working tool.</p>
-    <a href="https://serpicoailc.com/register" style="background:#f2b334;border-radius:5px;color:#020817;display:inline-block;font-size:16px;font-weight:700;min-width:270px;padding:15px 34px;text-decoration:none;">Reserve Your 1:1 Expert Training</a>
+    <a href="https://www.example.com/training" style="background:#f2b334;border-radius:5px;color:#020817;display:inline-block;font-size:16px;font-weight:700;min-width:270px;padding:15px 34px;text-decoration:none;">Reserve Your 1:1 Expert Training</a>
   </td>
 </tr>`;
 }
@@ -436,7 +436,7 @@ function renderNewsletterText(draft: NewsletterDraft) {
     })
     .join("\n\n");
 
-  return `${draft.subject}\n\n${draft.preheader}\n\n${draft.intro}\n\n${sectionText}\n\nExplore the Learning Center: https://serpicoailc.com\n\nReserve Your 1:1 Expert Training: https://serpicoailc.com/register\n\n© 2026 Serpico AI Learning Center · Phoenix, AZ`;
+  return `${draft.subject}\n\n${draft.preheader}\n\n${draft.intro}\n\n${sectionText}\n\nExplore the Learning Center: https://www.example.com\n\nReserve Your 1:1 Expert Training: https://www.example.com/training\n\n© 2026 Serpico AI Learning Center · Phoenix, AZ`;
 }
 
 function escapeHtml(value: string) {
