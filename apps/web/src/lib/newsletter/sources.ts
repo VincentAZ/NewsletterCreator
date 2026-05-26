@@ -29,7 +29,7 @@ export async function gatherArticles(
   const results = await Promise.allSettled(enabledSources.map((source) => fetchSource(source, options)));
   const articles = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
   return {
-    articles: dedupeArticles(articles).sort((a, b) => b.score - a.score).slice(0, 60),
+    articles: dedupeArticles(articles).filter((a) => !a.published || ageInDays(a.published) <= 3).sort((a, b) => b.score - a.score).slice(0, 60),
     sourceCount: enabledSources.length,
   };
 }
@@ -64,7 +64,7 @@ async function fetchRssSource(source: NewsSource): Promise<Article[]> {
   if (!response.ok) {
     throw new Error(`${source.name} failed with ${response.status}`);
   }
-  return parseFeed(await response.text(), source.name).slice(0, source.limit);
+  return parseFeed(await response.text(), source.name).filter((a) => !a.published || ageInDays(a.published) <= 3).slice(0, source.limit);
 }
 
 async function scrapeWebsiteSource(source: NewsSource, options: ScrapeOptions): Promise<Article[]> {

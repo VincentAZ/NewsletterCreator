@@ -1727,7 +1727,7 @@ function PromptField({
             type="button"
             className="smallManageButton"
             onClick={() => onChange(defaultValue)}
-            disabled={disabled || value === defaultValue}
+            disabled={disabled}
             title="Reset to default prompt"
           >
             Reset
