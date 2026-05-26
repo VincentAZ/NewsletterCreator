@@ -700,6 +700,94 @@ export function NewsletterDashboard() {
     setStatus(`${promptSet.name} loaded.`);
   }
 
+  async function renameSavedPrompt(promptSetId: string) {
+    const promptSet = findPromptSet(promptSets, promptSetId);
+    if (!promptSet) {
+      setStatus("Saved prompt not found.");
+      return false;
+    }
+
+    const nextName = window.prompt("Rename saved prompt", promptSet.name)?.trim().slice(0, 120);
+    if (!nextName || nextName === promptSet.name) {
+      return false;
+    }
+
+    const updatedAt = new Date().toISOString();
+    const nextPromptSets = promptSets.map((candidate) =>
+      candidate.id === promptSetId ? { ...candidate, name: nextName, updatedAt } : candidate,
+    );
+    const nextCurrentPromptSet =
+      currentPromptSet.id === promptSetId
+        ? buildCurrentPromptSet({ ...currentPromptSet, name: nextName, updatedAt })
+        : currentPromptSet;
+
+    setStatus(`Renaming ${promptSet.name}.`);
+    try {
+      const saved = await persistPreferencesNow({
+        currentPromptSet: nextCurrentPromptSet,
+        promptSets: nextPromptSets,
+        lastPromptSetId: selectedPromptSetId,
+      });
+      if (!saved) {
+        return false;
+      }
+      setPromptSets(nextPromptSets);
+      if (currentPromptSet.id === promptSetId) {
+        setPromptSetName(nextName);
+      }
+      setStatus(`${nextName} renamed.`);
+      return true;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : `${promptSet.name} rename failed.`);
+      return false;
+    }
+  }
+
+  async function deleteSavedPrompt(promptSetId: string) {
+    const promptSet = findPromptSet(promptSets, promptSetId);
+    if (!promptSet) {
+      setStatus("Saved prompt not found.");
+      return false;
+    }
+    if (!window.confirm(`Delete "${promptSet.name}"?`)) {
+      return false;
+    }
+
+    const deletingCurrentPromptSet = currentPromptSet.id === promptSetId || selectedPromptSetId === promptSetId;
+    const nextPromptSets = promptSets.filter((candidate) => candidate.id !== promptSetId);
+    const nextCurrentPromptSet = deletingCurrentPromptSet
+      ? buildCurrentPromptSet({
+          ...currentPromptSet,
+          id: "current-workflow-prompts",
+          name: "Current workflow prompts",
+          updatedAt: new Date().toISOString(),
+        })
+      : currentPromptSet;
+    const nextLastPromptSetId = deletingCurrentPromptSet ? "" : selectedPromptSetId;
+
+    setStatus(`Deleting ${promptSet.name}.`);
+    try {
+      const saved = await persistPreferencesNow({
+        currentPromptSet: nextCurrentPromptSet,
+        promptSets: nextPromptSets,
+        lastPromptSetId: nextLastPromptSetId,
+      });
+      if (!saved) {
+        return false;
+      }
+      setPromptSets(nextPromptSets);
+      if (deletingCurrentPromptSet) {
+        setSelectedPromptSetId("");
+        setPromptSetName("Current workflow prompts");
+      }
+      setStatus(`${promptSet.name} deleted.`);
+      return true;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : `${promptSet.name} delete failed.`);
+      return false;
+    }
+  }
+
   async function persistPreferencesNow(overrides: Partial<{
     sources: NewsSource[];
     copyModel: string;
@@ -806,6 +894,8 @@ export function NewsletterDashboard() {
             onSave={() => void savePrompt("AI scrape system prompt")}
             savedPromptSets={promptSets}
             onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "scrapeSystemPrompt", setScrapeSystemPrompt)}
+            onRenameSaved={renameSavedPrompt}
+            onDeleteSaved={deleteSavedPrompt}
             disabled={isBusy}
           />
           <PromptField
@@ -816,6 +906,8 @@ export function NewsletterDashboard() {
             onSave={() => void savePrompt("AI scrape task prompt")}
             savedPromptSets={promptSets}
             onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "scrapeTaskPrompt", setScrapeTaskPrompt)}
+            onRenameSaved={renameSavedPrompt}
+            onDeleteSaved={deleteSavedPrompt}
             disabled={isBusy}
             large
           />
@@ -852,6 +944,8 @@ export function NewsletterDashboard() {
             onSave={() => void savePrompt("Copy system prompt")}
             savedPromptSets={promptSets}
             onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "copySystemPrompt", setCopySystemPrompt)}
+            onRenameSaved={renameSavedPrompt}
+            onDeleteSaved={deleteSavedPrompt}
             disabled={isBusy}
           />
           <PromptField
@@ -862,6 +956,8 @@ export function NewsletterDashboard() {
             onSave={() => void savePrompt("Copy task prompt")}
             savedPromptSets={promptSets}
             onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "copyTaskPrompt", setCopyTaskPrompt)}
+            onRenameSaved={renameSavedPrompt}
+            onDeleteSaved={deleteSavedPrompt}
             disabled={isBusy}
             large
           />
@@ -897,6 +993,8 @@ export function NewsletterDashboard() {
             onSave={() => void savePrompt("Image system prompt")}
             savedPromptSets={promptSets}
             onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "imageSystemPrompt", setImageSystemPrompt)}
+            onRenameSaved={renameSavedPrompt}
+            onDeleteSaved={deleteSavedPrompt}
             disabled={isBusy}
           />
           <PromptField
@@ -907,6 +1005,8 @@ export function NewsletterDashboard() {
             onSave={() => void savePrompt("Image task prompt")}
             savedPromptSets={promptSets}
             onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "imageTaskPrompt", setImageTaskPrompt)}
+            onRenameSaved={renameSavedPrompt}
+            onDeleteSaved={deleteSavedPrompt}
             disabled={isBusy}
             large
           />
@@ -1224,6 +1324,8 @@ export function NewsletterDashboard() {
             onSave={() => void savePrompt("Whole-newsletter feedback")}
             savedPromptSets={promptSets}
             onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "globalFeedbackPrompt", setGlobalFeedback)}
+            onRenameSaved={renameSavedPrompt}
+            onDeleteSaved={deleteSavedPrompt}
             disabled={isBusy}
           />
 
@@ -1319,6 +1421,8 @@ export function NewsletterDashboard() {
             onSave={() => void savePrompt("Image feedback")}
             savedPromptSets={promptSets}
             onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "imageFeedbackPrompt", setImageFeedback)}
+            onRenameSaved={renameSavedPrompt}
+            onDeleteSaved={deleteSavedPrompt}
             disabled={isBusy}
           />
 
@@ -1547,6 +1651,8 @@ function PromptField({
   onSave,
   savedPromptSets,
   onSelectSaved,
+  onRenameSaved,
+  onDeleteSaved,
   disabled,
   large = false,
 }: {
@@ -1557,9 +1663,38 @@ function PromptField({
   onSave: () => void;
   savedPromptSets: PromptSet[];
   onSelectSaved: (promptSetId: string) => void;
+  onRenameSaved: (promptSetId: string) => Promise<boolean>;
+  onDeleteSaved: (promptSetId: string) => Promise<boolean>;
   disabled: boolean;
   large?: boolean;
 }) {
+  const [selectedSavedPromptId, setSelectedSavedPromptId] = useState("");
+  const selectedSavedPromptExists = savedPromptSets.some((promptSet) => promptSet.id === selectedSavedPromptId);
+  const selectedSavedPromptValue = selectedSavedPromptExists ? selectedSavedPromptId : "";
+
+  function handleSelectSaved(promptSetId: string) {
+    setSelectedSavedPromptId(promptSetId);
+    if (promptSetId) {
+      onSelectSaved(promptSetId);
+    }
+  }
+
+  async function handleRenameSaved() {
+    if (selectedSavedPromptValue) {
+      await onRenameSaved(selectedSavedPromptValue);
+    }
+  }
+
+  async function handleDeleteSaved() {
+    if (!selectedSavedPromptValue) {
+      return;
+    }
+    const deleted = await onDeleteSaved(selectedSavedPromptValue);
+    if (deleted) {
+      setSelectedSavedPromptId("");
+    }
+  }
+
   return (
     <div className="fieldBlock compact promptField">
       <div className="promptFieldHeader">
@@ -1567,12 +1702,8 @@ function PromptField({
         <div className="promptFieldActions">
           <select
             className="savedPromptSelect"
-            value=""
-            onChange={(event) => {
-              if (event.target.value) {
-                onSelectSaved(event.target.value);
-              }
-            }}
+            value={selectedSavedPromptValue}
+            onChange={(event) => handleSelectSaved(event.target.value)}
             disabled={disabled || savedPromptSets.length === 0}
             aria-label={`Load saved ${label}`}
           >
@@ -1585,6 +1716,22 @@ function PromptField({
           </select>
           <button type="button" className="smallSaveButton" onClick={onSave} disabled={disabled}>
             Save
+          </button>
+          <button
+            type="button"
+            className="smallManageButton"
+            onClick={() => void handleRenameSaved()}
+            disabled={disabled || !selectedSavedPromptValue}
+          >
+            Rename
+          </button>
+          <button
+            type="button"
+            className="smallManageButton danger"
+            onClick={() => void handleDeleteSaved()}
+            disabled={disabled || !selectedSavedPromptValue}
+          >
+            Delete
           </button>
         </div>
       </div>

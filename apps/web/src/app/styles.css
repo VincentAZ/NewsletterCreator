@@ -949,6 +949,7 @@ button.helpButton:focus-visible {
 .promptFieldActions {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
   min-width: 0;
 }
@@ -967,6 +968,20 @@ button.helpButton:focus-visible {
   min-height: 2rem;
   min-width: 3.75rem;
   padding: 0.35rem 0.6rem;
+}
+
+.smallManageButton {
+  background: #f8fafc;
+  border-radius: 6px;
+  color: #3f4b56;
+  font-size: 0.74rem;
+  min-height: 2rem;
+  min-width: 4rem;
+  padding: 0.35rem 0.55rem;
+}
+
+.smallManageButton.danger {
+  color: #a23b3b;
 }
 
 .sectionStack {
