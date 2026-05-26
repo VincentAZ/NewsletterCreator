@@ -19,14 +19,17 @@ Articles:
 {{articles}}`;
 
 export const defaultScrapeSystemPrompt =
-  "You extract article candidates from source-page link context for an AI newsletter. Return valid JSON only.";
+  "You extract article candidates from source-page link context for an AI newsletter. Today's date is {{currentDate}}. Return valid JSON only.";
 
 export const defaultScrapeTaskPrompt = `Source: {{sourceName}}
 Source URL: {{sourceUrl}}
 Page title: {{pageTitle}}
+Today's date: {{currentDate}}
 Max articles: {{maxArticles}}
 
-Choose only real article/news/story links from this page context. Ignore navigation, category pages, legal pages, social links, ads, newsletters, sign-in links, and duplicate links. Prefer recent AI, model, developer, policy, product, or research stories.
+Choose only real article/news/story links from this page context that were published within the last 3 days (on or after {{cutoffDate}}). If a candidate has a "published" field, use it to filter strictly. If no date is available, use clues in the URL or title (e.g. date slugs like /2026/05/24/) to judge recency. When you cannot determine the date at all, include the article only if the content appears current. Discard anything clearly older than 3 days.
+
+Ignore navigation, category pages, legal pages, social links, ads, newsletters, sign-in links, and duplicate links. Prefer AI, model, developer, policy, product, or research stories.
 
 Return this JSON shape:
 {"articles":[{"title":"string","url":"absolute URL","summary":"one sentence reason this is a relevant story"}]}

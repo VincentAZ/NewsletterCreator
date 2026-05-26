@@ -213,7 +213,8 @@ async function askAiSourceScraper(input: {
       messages: [
         {
           role: "system",
-          content: input.systemPrompt?.trim() || defaultScrapeSystemPrompt,
+          content: (input.systemPrompt?.trim() || defaultScrapeSystemPrompt)
+            .replaceAll("{{currentDate}}", new Date().toISOString().slice(0, 10)),
         },
         {
           role: "user",
@@ -240,12 +241,19 @@ function buildScrapeTaskPrompt(input: {
   candidates: Array<{ title: string; url: string; summary?: string; published?: string | null }>;
 }) {
   const candidatesJson = JSON.stringify(input.candidates);
+  const now = new Date();
+  const cutoff = new Date(now);
+  cutoff.setDate(cutoff.getDate() - 3);
+  const currentDate = now.toISOString().slice(0, 10);
+  const cutoffDate = cutoff.toISOString().slice(0, 10);
   const template = input.taskPrompt?.trim() || defaultScrapeTaskPrompt;
   const rendered = template
     .replaceAll("{{sourceName}}", input.source.name)
     .replaceAll("{{sourceUrl}}", input.source.url)
     .replaceAll("{{pageTitle}}", input.pageTitle || "unknown")
     .replaceAll("{{maxArticles}}", String(input.source.limit))
+    .replaceAll("{{currentDate}}", currentDate)
+    .replaceAll("{{cutoffDate}}", cutoffDate)
     .replaceAll("{{candidatesJson}}", candidatesJson);
 
   return rendered.includes(candidatesJson) ? rendered : `${rendered}\n\nLink candidates:\n${candidatesJson}`;
