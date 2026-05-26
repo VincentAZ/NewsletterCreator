@@ -872,6 +872,7 @@ export function NewsletterDashboard() {
             value={scrapeSystemPrompt}
             onChange={setScrapeSystemPrompt}
             placeholder={defaultScrapeSystemPrompt}
+            defaultValue={defaultScrapeSystemPrompt}
             promptKey="scrapeSystemPrompt"
             onSave={() => void savePrompt("AI scrape system prompt", "scrapeSystemPrompt")}
             savedPromptSets={promptSets}
@@ -885,6 +886,7 @@ export function NewsletterDashboard() {
             value={scrapeTaskPrompt}
             onChange={setScrapeTaskPrompt}
             placeholder={defaultScrapeTaskPrompt}
+            defaultValue={defaultScrapeTaskPrompt}
             promptKey="scrapeTaskPrompt"
             onSave={() => void savePrompt("AI scrape task prompt", "scrapeTaskPrompt")}
             savedPromptSets={promptSets}
@@ -924,6 +926,7 @@ export function NewsletterDashboard() {
             value={copySystemPrompt}
             onChange={setCopySystemPrompt}
             placeholder={defaultCopySystemPrompt}
+            defaultValue={defaultCopySystemPrompt}
             promptKey="copySystemPrompt"
             onSave={() => void savePrompt("Copy system prompt", "copySystemPrompt")}
             savedPromptSets={promptSets}
@@ -937,6 +940,7 @@ export function NewsletterDashboard() {
             value={copyTaskPrompt}
             onChange={setCopyTaskPrompt}
             placeholder={defaultCopyTaskPrompt}
+            defaultValue={defaultCopyTaskPrompt}
             promptKey="copyTaskPrompt"
             onSave={() => void savePrompt("Copy task prompt", "copyTaskPrompt")}
             savedPromptSets={promptSets}
@@ -975,6 +979,7 @@ export function NewsletterDashboard() {
             value={imageSystemPrompt}
             onChange={setImageSystemPrompt}
             placeholder={defaultImageSystemPrompt}
+            defaultValue={defaultImageSystemPrompt}
             promptKey="imageSystemPrompt"
             onSave={() => void savePrompt("Image system prompt", "imageSystemPrompt")}
             savedPromptSets={promptSets}
@@ -988,6 +993,7 @@ export function NewsletterDashboard() {
             value={imageTaskPrompt}
             onChange={setImageTaskPrompt}
             placeholder={defaultImageTaskPrompt}
+            defaultValue={defaultImageTaskPrompt}
             promptKey="imageTaskPrompt"
             onSave={() => void savePrompt("Image task prompt", "imageTaskPrompt")}
             savedPromptSets={promptSets}
@@ -1308,6 +1314,7 @@ export function NewsletterDashboard() {
             value={globalFeedback}
             onChange={setGlobalFeedback}
             placeholder="Ask for a different angle, tone, ordering, or story selection."
+            defaultValue=""
             promptKey="globalFeedbackPrompt"
             onSave={() => void savePrompt("Whole-newsletter feedback", "globalFeedbackPrompt")}
             savedPromptSets={promptSets}
@@ -1406,6 +1413,7 @@ export function NewsletterDashboard() {
             value={imageFeedback}
             onChange={setImageFeedback}
             placeholder="Change composition, palette, style, realism, or mood."
+            defaultValue=""
             promptKey="imageFeedbackPrompt"
             onSave={() => void savePrompt("Image feedback", "imageFeedbackPrompt")}
             savedPromptSets={promptSets}
@@ -1638,6 +1646,7 @@ function PromptField({
   value,
   onChange,
   placeholder,
+  defaultValue,
   onSave,
   savedPromptSets,
   onSelectSaved,
@@ -1651,6 +1660,7 @@ function PromptField({
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
+  defaultValue: string;
   onSave: () => void;
   savedPromptSets: PromptSet[];
   onSelectSaved: (promptSetId: string) => void;
@@ -1708,6 +1718,15 @@ function PromptField({
           </select>
           <button type="button" className="smallSaveButton" onClick={onSave} disabled={disabled}>
             Save
+          </button>
+          <button
+            type="button"
+            className="smallManageButton"
+            onClick={() => onChange(defaultValue)}
+            disabled={disabled || value === defaultValue}
+            title="Reset to default prompt"
+          >
+            Reset
           </button>
           <button
             type="button"
