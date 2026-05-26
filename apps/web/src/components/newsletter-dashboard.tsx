@@ -661,8 +661,12 @@ export function NewsletterDashboard() {
   }
 
   async function savePrompt(label: string, promptKey: PromptFieldKey) {
-    setStatus(`Saving ${label}.`);
-    const savedPromptSet = createSavedPromptSetSnapshot(currentPromptSet, label, promptKey);
+    const name = window.prompt("Name for this saved prompt:", label);
+    if (!name) {
+      return;
+    }
+    setStatus(`Saving ${name}.`);
+    const savedPromptSet = createSavedPromptSetSnapshot(currentPromptSet, name, promptKey);
     const nextPromptSets = [savedPromptSet, ...promptSets];
     try {
       const saved = await persistPreferencesNow({
