@@ -78,6 +78,16 @@ export type GeneratedImage = {
   generatedAt: string;
 };
 
+export type PromptFieldKey =
+  | "scrapeSystemPrompt"
+  | "scrapeTaskPrompt"
+  | "copySystemPrompt"
+  | "copyTaskPrompt"
+  | "imageSystemPrompt"
+  | "imageTaskPrompt"
+  | "globalFeedbackPrompt"
+  | "imageFeedbackPrompt";
+
 export type PromptSet = {
   id: string;
   name: string;
@@ -89,6 +99,9 @@ export type PromptSet = {
   imageTaskPrompt: string;
   globalFeedbackPrompt: string;
   imageFeedbackPrompt: string;
+  promptNames?: Partial<Record<PromptFieldKey, string>>;
+  savedPromptFields?: PromptFieldKey[];
+  deletedPromptFields?: PromptFieldKey[];
   updatedAt: string;
 };
 

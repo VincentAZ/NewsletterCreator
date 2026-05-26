@@ -1,6 +1,6 @@
 import { loadLocalEnv } from "./env";
 import { normalizeSources } from "./sources";
-import type { NewsletterPreferences, NewsSource, PromptSet } from "./types";
+import type { NewsletterPreferences, NewsSource, PromptFieldKey, PromptSet } from "./types";
 
 type PreferenceRow = {
   preference_id: string;
@@ -191,9 +191,43 @@ function normalizePromptSets(promptSets: PromptSet[]): PromptSet[] {
       imageTaskPrompt: String(promptSet.imageTaskPrompt ?? ""),
       globalFeedbackPrompt: String(promptSet.globalFeedbackPrompt ?? ""),
       imageFeedbackPrompt: String(promptSet.imageFeedbackPrompt ?? ""),
+      promptNames: normalizePromptNames(promptSet.promptNames),
+      savedPromptFields: normalizePromptFieldList(promptSet.savedPromptFields),
+      deletedPromptFields: normalizePromptFieldList(promptSet.deletedPromptFields),
       updatedAt: String(promptSet.updatedAt ?? new Date().toISOString()),
     }))
     .filter((promptSet) => promptSet.id && promptSet.name);
+}
+
+const promptFieldKeys: PromptFieldKey[] = [
+  "scrapeSystemPrompt",
+  "scrapeTaskPrompt",
+  "copySystemPrompt",
+  "copyTaskPrompt",
+  "imageSystemPrompt",
+  "imageTaskPrompt",
+  "globalFeedbackPrompt",
+  "imageFeedbackPrompt",
+];
+
+function normalizePromptNames(value: PromptSet["promptNames"]): PromptSet["promptNames"] {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    promptFieldKeys
+      .map((key) => [key, String(value[key] ?? "").trim().slice(0, 120)] as const)
+      .filter((entry): entry is [PromptFieldKey, string] => Boolean(entry[1])),
+  );
+}
+
+function normalizePromptFieldList(value: PromptSet["savedPromptFields"]): PromptFieldKey[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return promptFieldKeys.filter((key) => value.includes(key));
 }
 
 function normalizePromptSetId(value: string) {
