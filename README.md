@@ -33,7 +33,7 @@ $env:MAILCHIMP_SECTION_BODY = "body"
 
 `FAL_KEY` should be an Admin key if you want the app to display account credits from fal's billing endpoint.
 
-Supabase is required for persisted dashboard preferences. Custom sources, selected models, the currently edited workflow prompts, saved prompt sets, and the last used prompt set are stored in the `newsletter_preferences` table under the stable `default-preferences` row.
+Supabase is required for persisted dashboard preferences. Custom sources, selected models, the currently edited eight workflow prompts, saved prompt sets, and the last used prompt set are stored in the `newsletter_preferences` table under the stable `default-preferences` row.
 
 Mailchimp is configured once through `.env`. `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID`, `MAILCHIMP_FROM_NAME`, and `MAILCHIMP_REPLY_TO` are required to create a draft campaign. `MAILCHIMP_REPLY_TO` must be a real sender address Mailchimp accepts for the account. In UI fields that ask for an email address, enter only the address, for example `info@example.com`, not `MAILCHIMP_REPLY_TO=info@example.com`. If `MAILCHIMP_SERVER` is omitted, the app infers it from the API key suffix, for example `us21`.
 

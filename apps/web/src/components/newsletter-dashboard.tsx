@@ -60,6 +60,16 @@ type PreferencesPayload = {
   error?: string;
 };
 
+type PromptFieldKey =
+  | "scrapeSystemPrompt"
+  | "scrapeTaskPrompt"
+  | "copySystemPrompt"
+  | "copyTaskPrompt"
+  | "imageSystemPrompt"
+  | "imageTaskPrompt"
+  | "globalFeedbackPrompt"
+  | "imageFeedbackPrompt";
+
 type MailchimpPayload = {
   campaign?: MailchimpCampaignDraft;
   error?: string;
@@ -215,10 +225,14 @@ export function NewsletterDashboard() {
         copyTaskPrompt,
         imageSystemPrompt,
         imageTaskPrompt,
+        globalFeedbackPrompt: globalFeedback,
+        imageFeedbackPrompt: imageFeedback,
       }),
     [
       copySystemPrompt,
       copyTaskPrompt,
+      globalFeedback,
+      imageFeedback,
       imageSystemPrompt,
       imageTaskPrompt,
       promptSetName,
@@ -292,6 +306,8 @@ export function NewsletterDashboard() {
           setCopyTaskPrompt,
           setImageSystemPrompt,
           setImageTaskPrompt,
+          setGlobalFeedback,
+          setImageFeedback,
         });
       }
       lastSavedPreferences.current = preferences && !shouldMigrateLegacyPreferences
@@ -655,12 +671,33 @@ export function NewsletterDashboard() {
 
   async function savePrompt(label: string) {
     setStatus(`Saving ${label}.`);
+    const savedPromptSet = createSavedPromptSetSnapshot(currentPromptSet, label);
+    const nextPromptSets = [savedPromptSet, ...promptSets];
     try {
-      await persistPreferencesNow({ currentPromptSet });
+      const saved = await persistPreferencesNow({
+        currentPromptSet: savedPromptSet,
+        promptSets: nextPromptSets,
+        lastPromptSetId: savedPromptSet.id,
+      });
+      if (!saved) {
+        return;
+      }
+      setPromptSets(nextPromptSets);
+      setSelectedPromptSetId(savedPromptSet.id);
+      setPromptSetName(savedPromptSet.name);
       setStatus(`${label} saved.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : `${label} save failed.`);
     }
+  }
+
+  function applySavedPrompt(promptSetId: string, promptKey: PromptFieldKey, setValue: (value: string) => void) {
+    const promptSet = findPromptSet(promptSets, promptSetId);
+    if (!promptSet) {
+      return;
+    }
+    setValue(promptSet[promptKey]);
+    setStatus(`${promptSet.name} loaded.`);
   }
 
   async function persistPreferencesNow(overrides: Partial<{
@@ -693,20 +730,19 @@ export function NewsletterDashboard() {
     });
 
     if (saveVersion !== preferenceSaveSequence.current) {
-      return;
+      return false;
     }
 
     if (!payload.configured) {
-      setStatus("Supabase is required to save prompts. Add Supabase env vars and run the schema script.");
-      return;
+      throw new Error("Supabase is required to save prompts. Add Supabase env vars and run the schema script.");
     }
     if (payload.error) {
-      setStatus(payload.error);
-      return;
+      throw new Error(payload.error);
     }
 
     lastSavedPreferences.current = serializePreferences(preferences);
     setStatus("Preferences saved.");
+    return true;
   }
 
   return (
@@ -768,6 +804,8 @@ export function NewsletterDashboard() {
             onChange={setScrapeSystemPrompt}
             placeholder={defaultScrapeSystemPrompt}
             onSave={() => void savePrompt("AI scrape system prompt")}
+            savedPromptSets={promptSets}
+            onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "scrapeSystemPrompt", setScrapeSystemPrompt)}
             disabled={isBusy}
           />
           <PromptField
@@ -776,6 +814,8 @@ export function NewsletterDashboard() {
             onChange={setScrapeTaskPrompt}
             placeholder={defaultScrapeTaskPrompt}
             onSave={() => void savePrompt("AI scrape task prompt")}
+            savedPromptSets={promptSets}
+            onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "scrapeTaskPrompt", setScrapeTaskPrompt)}
             disabled={isBusy}
             large
           />
@@ -810,6 +850,8 @@ export function NewsletterDashboard() {
             onChange={setCopySystemPrompt}
             placeholder={defaultCopySystemPrompt}
             onSave={() => void savePrompt("Copy system prompt")}
+            savedPromptSets={promptSets}
+            onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "copySystemPrompt", setCopySystemPrompt)}
             disabled={isBusy}
           />
           <PromptField
@@ -818,6 +860,8 @@ export function NewsletterDashboard() {
             onChange={setCopyTaskPrompt}
             placeholder={defaultCopyTaskPrompt}
             onSave={() => void savePrompt("Copy task prompt")}
+            savedPromptSets={promptSets}
+            onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "copyTaskPrompt", setCopyTaskPrompt)}
             disabled={isBusy}
             large
           />
@@ -851,6 +895,8 @@ export function NewsletterDashboard() {
             onChange={setImageSystemPrompt}
             placeholder={defaultImageSystemPrompt}
             onSave={() => void savePrompt("Image system prompt")}
+            savedPromptSets={promptSets}
+            onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "imageSystemPrompt", setImageSystemPrompt)}
             disabled={isBusy}
           />
           <PromptField
@@ -859,6 +905,8 @@ export function NewsletterDashboard() {
             onChange={setImageTaskPrompt}
             placeholder={defaultImageTaskPrompt}
             onSave={() => void savePrompt("Image task prompt")}
+            savedPromptSets={promptSets}
+            onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "imageTaskPrompt", setImageTaskPrompt)}
             disabled={isBusy}
             large
           />
@@ -1168,14 +1216,16 @@ export function NewsletterDashboard() {
             </button>
           </div>
 
-          <label className="fieldBlock">
-            Whole-newsletter feedback
-            <textarea
-              value={globalFeedback}
-              onChange={(event) => setGlobalFeedback(event.target.value)}
-              placeholder="Ask for a different angle, tone, ordering, or story selection."
-            />
-          </label>
+          <PromptField
+            label="Whole-newsletter feedback"
+            value={globalFeedback}
+            onChange={setGlobalFeedback}
+            placeholder="Ask for a different angle, tone, ordering, or story selection."
+            onSave={() => void savePrompt("Whole-newsletter feedback")}
+            savedPromptSets={promptSets}
+            onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "globalFeedbackPrompt", setGlobalFeedback)}
+            disabled={isBusy}
+          />
 
           {draft ? (
             <>
@@ -1261,14 +1311,16 @@ export function NewsletterDashboard() {
             </label>
           ) : null}
 
-          <label className="fieldBlock">
-            Image feedback
-            <textarea
-              value={imageFeedback}
-              onChange={(event) => setImageFeedback(event.target.value)}
-              placeholder="Change composition, palette, style, realism, or mood."
-            />
-          </label>
+          <PromptField
+            label="Image feedback"
+            value={imageFeedback}
+            onChange={setImageFeedback}
+            placeholder="Change composition, palette, style, realism, or mood."
+            onSave={() => void savePrompt("Image feedback")}
+            savedPromptSets={promptSets}
+            onSelectSaved={(promptSetId) => applySavedPrompt(promptSetId, "imageFeedbackPrompt", setImageFeedback)}
+            disabled={isBusy}
+          />
 
           <div className="imagePreview">
             {image ? <img src={image.url} alt="Generated newsletter hero" /> : <span>No hero image yet.</span>}
@@ -1493,6 +1545,8 @@ function PromptField({
   onChange,
   placeholder,
   onSave,
+  savedPromptSets,
+  onSelectSaved,
   disabled,
   large = false,
 }: {
@@ -1501,6 +1555,8 @@ function PromptField({
   onChange: (value: string) => void;
   placeholder: string;
   onSave: () => void;
+  savedPromptSets: PromptSet[];
+  onSelectSaved: (promptSetId: string) => void;
   disabled: boolean;
   large?: boolean;
 }) {
@@ -1508,9 +1564,29 @@ function PromptField({
     <div className="fieldBlock compact promptField">
       <div className="promptFieldHeader">
         <span>{label}</span>
-        <button type="button" className="smallSaveButton" onClick={onSave} disabled={disabled}>
-          Save
-        </button>
+        <div className="promptFieldActions">
+          <select
+            className="savedPromptSelect"
+            value=""
+            onChange={(event) => {
+              if (event.target.value) {
+                onSelectSaved(event.target.value);
+              }
+            }}
+            disabled={disabled || savedPromptSets.length === 0}
+            aria-label={`Load saved ${label}`}
+          >
+            <option value="">{savedPromptSets.length ? "Saved prompts" : "No saved prompts"}</option>
+            {savedPromptSets.map((promptSet) => (
+              <option key={promptSet.id} value={promptSet.id}>
+                {promptSet.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="smallSaveButton" onClick={onSave} disabled={disabled}>
+            Save
+          </button>
+        </div>
       </div>
       <textarea
         className={`systemPromptInput ${large ? "large" : ""}`}
@@ -1625,6 +1701,8 @@ function normalizeDashboardPromptSets(promptSets: PromptSet[]): PromptSet[] {
         copyTaskPrompt: promptSet.copyTaskPrompt || defaultCopyTaskPrompt,
         imageSystemPrompt: promptSet.imageSystemPrompt || defaultImageSystemPrompt,
         imageTaskPrompt: promptSet.imageTaskPrompt || defaultImageTaskPrompt,
+        globalFeedbackPrompt: promptSet.globalFeedbackPrompt || "",
+        imageFeedbackPrompt: promptSet.imageFeedbackPrompt || "",
         updatedAt: promptSet.updatedAt,
       }),
     )
@@ -1640,6 +1718,8 @@ function buildCurrentPromptSet(input: {
   copyTaskPrompt: string;
   imageSystemPrompt: string;
   imageTaskPrompt: string;
+  globalFeedbackPrompt: string;
+  imageFeedbackPrompt: string;
   updatedAt?: string;
 }): PromptSet {
   return {
@@ -1651,8 +1731,20 @@ function buildCurrentPromptSet(input: {
     copyTaskPrompt: input.copyTaskPrompt,
     imageSystemPrompt: input.imageSystemPrompt,
     imageTaskPrompt: input.imageTaskPrompt,
+    globalFeedbackPrompt: input.globalFeedbackPrompt,
+    imageFeedbackPrompt: input.imageFeedbackPrompt,
     updatedAt: input.updatedAt || new Date().toISOString(),
   };
+}
+
+function createSavedPromptSetSnapshot(currentPromptSet: PromptSet, label: string): PromptSet {
+  const now = new Date();
+  return buildCurrentPromptSet({
+    ...currentPromptSet,
+    id: `prompt-${now.getTime().toString(36)}`,
+    name: `${label} ${now.toLocaleString()}`,
+    updatedAt: now.toISOString(),
+  });
 }
 
 function findPromptSet(promptSets: PromptSet[], promptSetId?: string) {
@@ -1670,6 +1762,8 @@ function applyPromptSetState(
     setCopyTaskPrompt: (value: string) => void;
     setImageSystemPrompt: (value: string) => void;
     setImageTaskPrompt: (value: string) => void;
+    setGlobalFeedback: (value: string) => void;
+    setImageFeedback: (value: string) => void;
   },
 ) {
   setters.setSelectedPromptSetId(promptSet.id);
@@ -1680,6 +1774,8 @@ function applyPromptSetState(
   setters.setCopyTaskPrompt(promptSet.copyTaskPrompt);
   setters.setImageSystemPrompt(promptSet.imageSystemPrompt);
   setters.setImageTaskPrompt(promptSet.imageTaskPrompt);
+  setters.setGlobalFeedback(promptSet.globalFeedbackPrompt);
+  setters.setImageFeedback(promptSet.imageFeedbackPrompt);
 }
 
 function serializePreferences(input: {

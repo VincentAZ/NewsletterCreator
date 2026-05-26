@@ -87,6 +87,8 @@ export type PromptSet = {
   copyTaskPrompt: string;
   imageSystemPrompt: string;
   imageTaskPrompt: string;
+  globalFeedbackPrompt: string;
+  imageFeedbackPrompt: string;
   updatedAt: string;
 };
 

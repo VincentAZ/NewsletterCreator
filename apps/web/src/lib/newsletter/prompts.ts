@@ -57,6 +57,8 @@ export function createDefaultPromptSet(): PromptSet {
     copyTaskPrompt: defaultCopyTaskPrompt,
     imageSystemPrompt: defaultImageSystemPrompt,
     imageTaskPrompt: defaultImageTaskPrompt,
+    globalFeedbackPrompt: "",
+    imageFeedbackPrompt: "",
     updatedAt: new Date(0).toISOString(),
   };
 }

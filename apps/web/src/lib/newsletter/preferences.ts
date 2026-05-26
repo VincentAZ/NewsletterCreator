@@ -189,6 +189,8 @@ function normalizePromptSets(promptSets: PromptSet[]): PromptSet[] {
       copyTaskPrompt: String(promptSet.copyTaskPrompt ?? ""),
       imageSystemPrompt: String(promptSet.imageSystemPrompt ?? ""),
       imageTaskPrompt: String(promptSet.imageTaskPrompt ?? ""),
+      globalFeedbackPrompt: String(promptSet.globalFeedbackPrompt ?? ""),
+      imageFeedbackPrompt: String(promptSet.imageFeedbackPrompt ?? ""),
       updatedAt: String(promptSet.updatedAt ?? new Date().toISOString()),
     }))
     .filter((promptSet) => promptSet.id && promptSet.name);

@@ -936,6 +936,7 @@ button.helpButton:focus-visible {
 .promptFieldHeader {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: space-between;
   min-width: 0;
@@ -945,7 +946,22 @@ button.helpButton:focus-visible {
   min-width: 0;
 }
 
-.toolbar .smallSaveButton {
+.promptFieldActions {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.savedPromptSelect {
+  font-size: 0.74rem;
+  max-width: min(12rem, 100%);
+  min-height: 2rem;
+  padding: 0.35rem 1.8rem 0.35rem 0.55rem;
+  width: auto;
+}
+
+.smallSaveButton {
   border-radius: 6px;
   font-size: 0.74rem;
   min-height: 2rem;
