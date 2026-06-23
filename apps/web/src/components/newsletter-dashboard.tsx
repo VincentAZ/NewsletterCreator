@@ -628,7 +628,7 @@ export function NewsletterDashboard() {
     setSelectedArticleIds(new Set(visibleArticles.slice(0, count).map((article) => article.id)));
   }
 
-  function updateDraftField(field: "subject" | "preheader" | "intro" | "imagePrompt", value: string) {
+  function updateDraftField(field: "subject" | "preheader" | "intro" | "imagePrompt" | "nextAma", value: string) {
     setDraft((current) => (current ? { ...current, [field]: value } : current));
   }
 
@@ -1337,6 +1337,11 @@ export function NewsletterDashboard() {
                 onChange={(value) => updateDraftField("preheader", value)}
               />
               <DraftTextField label="Intro" value={draft.intro} onChange={(value) => updateDraftField("intro", value)} multiline />
+              <DraftTextField
+                label="Next AMA line (optional)"
+                value={draft.nextAma ?? ""}
+                onChange={(value) => updateDraftField("nextAma", value)}
+              />
 
               <div className="sectionStack">
                 {draft.sections.map((section, sectionIndex) => (

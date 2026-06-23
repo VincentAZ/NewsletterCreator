@@ -64,6 +64,7 @@ export type NewsletterDraft = {
   subject: string;
   preheader: string;
   intro: string;
+  nextAma?: string;
   sections: NewsletterSection[];
   imagePrompt: string;
   confidenceScore: number;

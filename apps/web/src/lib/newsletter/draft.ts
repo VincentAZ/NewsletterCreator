@@ -67,6 +67,7 @@ export function normalizeDraft(draft: NewsletterDraft): NewsletterDraft {
     subject: draft.subject ?? "",
     preheader: draft.preheader ?? "",
     intro: draft.intro ?? "",
+    nextAma: draft.nextAma ?? "",
     sections: (draft.sections ?? []).map((section, index) => ({
       id: section.id || slugify(section.heading || `section-${index + 1}`),
       heading: section.heading ?? "",

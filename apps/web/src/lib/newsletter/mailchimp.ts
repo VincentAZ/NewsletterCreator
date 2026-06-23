@@ -362,8 +362,12 @@ function renderNewsletterHtml(draft: NewsletterDraft, image: GeneratedImage) {
 }
 
 function renderIntroHtml(draft: NewsletterDraft) {
+  const nextAma = draft.nextAma?.trim();
+  const nextAmaHtml = nextAma
+    ? `\n<p style="color:#031126;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;line-height:1.45;margin:14px 0 0;max-width:560px;">${escapeHtml(nextAma)}</p>`
+    : "";
   return `<h1 style="color:#031126;font-family:Arial,Helvetica,sans-serif;font-size:29px;font-weight:700;line-height:1.1;margin:0 0 10px;">${escapeHtml(draft.subject)}</h1>
-<p style="color:#111827;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.45;margin:0;max-width:560px;">${escapeHtml(draft.intro)}</p>`;
+<p style="color:#111827;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.45;margin:0;max-width:560px;">${escapeHtml(draft.intro)}</p>${nextAmaHtml}`;
 }
 
 function renderHeroImageHtml(image: GeneratedImage, subject: string) {
