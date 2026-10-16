@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { createServer } from "node:net";
+import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
@@ -10,11 +12,12 @@ import {
   readFileSync,
 } from "node:fs";
 import { join, dirname, resolve, relative, isAbsolute } from "node:path";
-import { homedir, totalmem } from "node:os";
+import { homedir, totalmem, release } from "node:os";
 import { extractZip } from "./archive";
 import { x as extractTar } from "tar";
 import type { SetupStatus } from "@newsletter/core";
 import manifest from "./runtime-manifest.json";
+import pythonLocks from "./python-locks/index.json";
 import { download, type Artifact } from "./download";
 import { jsonRequest, localUrl } from "./network";
 import type { Store } from "./store";
@@ -97,7 +100,10 @@ export class Engines {
           (Number(disk.bavail) * Number(disk.bsize)) / 1024 ** 3,
         ),
         gpu,
-        managedSupported: Boolean(manifest.engines[this.platform]),
+        managedSupported:
+          Boolean(manifest.engines[this.platform]) &&
+          (process.platform !== "darwin" ||
+            Number(release().split(".")[0]) >= 23),
       },
       engines: [
         {
@@ -142,7 +148,7 @@ export class Engines {
         },
         {
           id: "image-engine",
-          name: "ComfyUI + Python/PyTorch (allow 8 GB additional)",
+          name: "ComfyUI + Python/PyTorch (allow 12 GB additional)",
           bytes: 0,
           termsUrl:
             "https://github.com/comfyanonymous/ComfyUI/blob/v0.41.0/LICENSE",
@@ -161,26 +167,43 @@ export class Engines {
           "Managed setup is not available on this architecture. Connect an existing local engine in Settings.",
         );
       const status = await this.status();
-      if (status.hardware.freeDiskGB < (engine === "text" ? 8 : 20))
+      if (!status.hardware.managedSupported)
         throw new Error(
-          "Free at least 8 GB for text setup or 20 GB for image setup, then retry.",
+          "Managed Apple Silicon setup requires macOS 14 or later. Existing compatible engine connections and manual authoring remain available.",
         );
-      if (
-        status.engines.find((item) => item.id === engine)?.connected &&
-        !this.installed(engine)
-      ) {
+      if (status.hardware.freeDiskGB < (engine === "text" ? 8 : 30))
+        throw new Error(
+          "Free at least 8 GB for text setup or 30 GB for image setup, then retry.",
+        );
+      const owned = this.processes.get(engine);
+      if (owned) {
+        const exited = once(owned, "exit", {
+          signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
+        });
+        this.stop(engine);
+        await exited;
+      } else if (status.engines.find((item) => item.id === engine)?.connected) {
         report(
           "Existing engine detected; its installation and settings are unchanged.",
         );
         return status;
       }
-      if (engine === "text" && this.existingLms() && !this.installed("text"))
+      if (
+        engine === "text" &&
+        this.existingLms() &&
+        !existsSync(join(this.root, "text", "setup-started.json")) &&
+        !this.installed("text")
+      )
         throw new Error(
           "Existing LM Studio detected. Start its local server and choose a model in Settings. Managed setup will not overwrite your installation.",
         );
       const target = join(this.root, engine);
       mkdirSync(target, { recursive: true });
       if (engine === "text") {
+        writeFileSync(
+          join(target, "setup-started.json"),
+          JSON.stringify({ version: manifest.version }),
+        );
         report("Installing verified LM Studio engine…");
         await this.unpack(
           artifacts.text,
@@ -276,46 +299,48 @@ export class Engines {
           report,
           this.pythonEnv(),
         );
-        const index =
+        const backend =
           process.platform === "darwin"
-            ? "https://pypi.org/simple"
+            ? "metal"
             : status.hardware.gpu.includes("CPU")
-              ? "https://download.pytorch.org/whl/cpu"
-              : "https://download.pytorch.org/whl/cu128";
+              ? "cpu"
+              : "cu128";
+        const lockKey =
+          `${this.platform}-${backend}` as keyof typeof pythonLocks;
+        const lock = pythonLocks[lockKey];
+        if (!lock)
+          throw new Error(
+            "No verified Python dependency lock is available for this hardware.",
+          );
+        const dependencies = readFileSync(
+          join(__dirname, "python-locks", lock.file),
+        );
+        if (
+          createHash("sha256").update(dependencies).digest("hex") !==
+          lock.sha256
+        )
+          throw new Error(
+            "The bundled Python dependency lock failed its integrity check. Reinstall NewsletterCreator.",
+          );
+        const requirements = join(target, "requirements.lock");
+        writeFileSync(requirements, dependencies);
+        report("Installing pinned and hash-verified Python packages…");
         await run(
           uv,
           [
             "pip",
-            "install",
+            "sync",
             "--python",
             this.python(),
-            "torch==2.9.1",
-            "torchvision==0.24.1",
-            "torchaudio==2.9.1",
-            "--index-url",
-            index,
-          ],
-          target,
-          signal,
-          report,
-          this.pythonEnv(),
-        );
-        const constraints = join(target, "constraints.txt");
-        writeFileSync(
-          constraints,
-          "torch==2.9.1\ntorchvision==0.24.1\ntorchaudio==2.9.1\n",
-        );
-        await run(
-          uv,
-          [
-            "pip",
-            "install",
-            "--python",
-            this.python(),
-            "-r",
-            join(sourceDir, extracted, "requirements.txt"),
-            "-c",
-            constraints,
+            "--require-hashes",
+            "--only-binary",
+            ":all:",
+            "--torch-backend",
+            backend === "metal" ? "cpu" : backend,
+            "--default-index",
+            "https://pypi.org/simple",
+            "--no-config",
+            requirements,
           ],
           target,
           signal,
@@ -546,6 +571,9 @@ export class Engines {
       child.kill();
       this.processes.delete(engine);
     }
+  }
+  owns(engine: Engine) {
+    return this.processes.has(engine);
   }
   stopAll() {
     this.stop("text");

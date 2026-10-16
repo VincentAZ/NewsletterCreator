@@ -9,6 +9,7 @@ import {
   newBlock,
   renderEmail,
   settingsSchema,
+  undoEdit,
 } from "@newsletter/core";
 import { Store } from "../src/main/store";
 import { generateCopy, type TextProvider } from "../src/main/providers";
@@ -166,4 +167,49 @@ test("local mode rejects external inference URLs", () => {
   assert.equal(localUrl("http://127.0.0.1:1234/v1"), "http://127.0.0.1:1234");
   assert.throws(() => localUrl("https://external.example.com"), /loopback/);
   assert.throws(() => localUrl("http://secret@localhost:1234"), /loopback/);
+});
+
+test("undoing a generated block retains later edits in unrelated sections", () => {
+  const profile = newProfile("Neighbors");
+  const before = {
+    ...newIssue(profile.id),
+    subject: "Original subject",
+    blocks: [
+      { ...newBlock("story"), title: "Original story", body: "Original body" },
+      {
+        ...newBlock("event"),
+        title: "Meet Saturday",
+        body: "Community garden",
+      },
+    ],
+  };
+  const after = {
+    ...before,
+    blocks: [
+      { ...before.blocks[0], body: "Generated replacement" },
+      before.blocks[1],
+    ],
+  };
+  const current = {
+    ...after,
+    revision: 7,
+    subject: "My later subject edit",
+    blocks: [
+      after.blocks[0],
+      { ...after.blocks[1], body: "Bring seeds and coffee" },
+    ],
+  };
+  const restored = undoEdit(current, { before, after });
+  assert.equal(restored.blocks[0].body, "Original body");
+  assert.equal(restored.blocks[1].body, "Bring seeds and coffee");
+  assert.equal(restored.subject, "My later subject edit");
+  assert.equal(restored.revision, 7);
+  const replacedStories = {
+    ...before,
+    blocks: [before.blocks[1], newBlock("story")],
+  };
+  assert.deepEqual(
+    undoEdit(replacedStories, { before, after: replacedStories }).blocks,
+    before.blocks,
+  );
 });

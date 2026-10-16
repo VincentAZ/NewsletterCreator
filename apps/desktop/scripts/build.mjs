@@ -1,3 +1,4 @@
+import { cp } from "node:fs/promises";
 import { build } from "esbuild";
 import { build as viteBuild } from "vite";
 await build({
@@ -19,5 +20,8 @@ await build({
   format: "cjs",
   external: ["electron"],
   sourcemap: true,
+});
+await cp("src/main/python-locks", "dist/main/python-locks", {
+  recursive: true,
 });
 await viteBuild();

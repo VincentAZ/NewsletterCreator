@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, session, dialog } from "electron";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { channel } from "node:diagnostics_channel";
+import { appendFileSync } from "node:fs";
 import { commandSchemas, type Command } from "@newsletter/core";
 import { Store } from "./store";
 import { Credentials } from "./credentials";
@@ -11,6 +13,27 @@ import { createHandlers } from "./handlers";
 // Test builds may isolate data without changing the user's OS home directory.
 if (process.env.NEWSLETTER_TEST_DATA && !app.isPackaged)
   app.setPath("userData", process.env.NEWSLETTER_TEST_DATA);
+// Opt-in test instrumentation records destinations only, never credentials,
+// prompts or source bodies. Packaged builds ignore these test variables.
+if (
+  process.env.NEWSLETTER_TEST_DATA &&
+  !app.isPackaged &&
+  process.env.NEWSLETTER_TEST_TRACE
+) {
+  const tracePath = join(process.env.NEWSLETTER_TEST_DATA, "network.jsonl");
+  channel("undici:request:create").subscribe((message) => {
+    const { request } = message as {
+      request: { origin: string; path: string };
+    };
+    appendFileSync(
+      tracePath,
+      JSON.stringify({
+        origin: String(request.origin),
+        path: request.path.split("?")[0],
+      }) + "\n",
+    );
+  });
+}
 const locked = app.requestSingleInstanceLock();
 if (!locked) app.quit();
 let window: BrowserWindow | null = null;
@@ -26,6 +49,8 @@ if (locked)
   void app
     .whenReady()
     .then(() => {
+      session.defaultSession.setSpellCheckerEnabled(false);
+      session.defaultSession.setSpellCheckerLanguages([]);
       store = new Store(app.getPath("userData"));
       engines = new Engines(store);
       jobs = new Jobs((progress) => {
@@ -60,6 +85,7 @@ if (locked)
           nodeIntegration: false,
           sandbox: true,
           webSecurity: true,
+          spellcheck: false, // Avoid Chromium's automatic dictionary downloads.
         },
       });
       window.removeMenu();

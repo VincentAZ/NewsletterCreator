@@ -75,6 +75,7 @@
     "digest": "sha256:ec9186e0539ab9c2c497b632aebae7f676ce4b0464639b91a72a063dd17471ec",
     "bytes": 13416540,
     "archive": "zip",
-    "version": "v0.41.0"
+    "version": "v0.41.0",
+    "requirementsSha256": "885101126cd70174d3c5fcf27a97a7e4cf97dd23b13702073a954be8e61d631d"
   }
 }

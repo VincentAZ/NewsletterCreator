@@ -1,9 +1,12 @@
 appId: com.newslettercreator.desktop
 productName: NewsletterCreator
 executableName: newslettercreator
+icon: build/icon.png
 copyright: Copyright © 2026 Vincent Serpico
 asar: true
 npmRebuild: false
+toolsets:
+  wine: "1.0.1"
 directories:
   output: release
 files:

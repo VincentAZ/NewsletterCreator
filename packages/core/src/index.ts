@@ -107,6 +107,76 @@ export const settingsSchema = z.object({
 });
 export type Profile = z.infer<typeof profileSchema>;
 export type Issue = z.infer<typeof issueSchema>;
+export type UndoEdit = { before: Issue; after: Issue };
+
+/** Reverse only fields touched by an editorial action; keep unrelated later edits. */
+export function undoEdit(current: Issue, edit: UndoEdit): Issue {
+  if (current.id !== edit.before.id || current.id !== edit.after.id)
+    return current;
+  const before = new Map(edit.before.blocks.map((block) => [block.id, block]));
+  const after = new Map(edit.after.blocks.map((block) => [block.id, block]));
+  let blocks = current.blocks
+    .filter((block) => before.has(block.id) || !after.has(block.id))
+    .map((block) =>
+      before.has(block.id) && after.has(block.id)
+        ? restoreFields(block, before.get(block.id)!, after.get(block.id)!, [
+            "id",
+          ])
+        : block,
+    );
+  for (let index = 0; index < edit.before.blocks.length; index++) {
+    const block = edit.before.blocks[index];
+    if (after.has(block.id) || blocks.some((value) => value.id === block.id))
+      continue;
+    const next = edit.before.blocks
+      .slice(index + 1)
+      .find((value) => blocks.some((candidate) => candidate.id === value.id));
+    const position = next
+      ? blocks.findIndex((value) => value.id === next.id)
+      : blocks.length;
+    blocks.splice(position, 0, structuredClone(block));
+  }
+  const oldOrder = edit.before.blocks.map((block) => block.id);
+  const newOrder = edit.after.blocks.map((block) => block.id);
+  if (
+    oldOrder.length === newOrder.length &&
+    oldOrder.every((id) => after.has(id)) &&
+    oldOrder.join() !== newOrder.join()
+  ) {
+    const byId = new Map(blocks.map((block) => [block.id, block]));
+    blocks = [
+      ...oldOrder.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])),
+      ...blocks.filter((block) => !before.has(block.id)),
+    ];
+  }
+  return {
+    ...restoreFields(current, edit.before, edit.after, [
+      "id",
+      "profileId",
+      "blocks",
+      "articles",
+      "revision",
+      "updatedAt",
+    ]),
+    blocks,
+  };
+}
+function restoreFields<T extends object>(
+  current: T,
+  before: T,
+  after: T,
+  excluded: string[],
+): T {
+  const result = { ...current };
+  for (const key of Object.keys(before) as Array<keyof T>) {
+    if (
+      !excluded.includes(String(key)) &&
+      JSON.stringify(before[key]) !== JSON.stringify(after[key])
+    )
+      result[key] = structuredClone(before[key]);
+  }
+  return result;
+}
 export type Article = z.infer<typeof articleSchema>;
 export type Block = z.infer<typeof blockSchema>;
 export type Settings = z.infer<typeof settingsSchema>;

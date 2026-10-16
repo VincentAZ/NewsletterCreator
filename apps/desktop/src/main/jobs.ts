@@ -20,10 +20,11 @@ export class Jobs {
       this.notify({ jobId: id, stage: "working", message, completed, total });
     const execute = async () => {
       controller.signal.throwIfAborted();
+      report("Working…");
       return work(controller.signal, report);
     };
     try {
-      report(inference ? "Waiting for local generation…" : "Starting…");
+      report(inference ? "Waiting to start…" : "Starting…");
       const result = inference
         ? this.inferenceTail.then(execute, execute)
         : execute();

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createServer } from "node:http";
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { newProfile, settingsSchema } from "@newsletter/core";
 import { gather } from "../src/main/gather";
 import {
@@ -10,6 +12,7 @@ import {
 } from "../src/main/providers";
 import { fetchPublic, privateAddress } from "../src/main/network";
 import { assertPortFree } from "../src/main/engines";
+import pythonLocks from "../src/main/python-locks/index.json";
 
 test("local provider failure and malformed output never call a cloud provider", async () => {
   const oldFetch = globalThis.fetch;
@@ -39,10 +42,39 @@ test("local provider failure and malformed output never call a cloud provider", 
       provider.complete("system", "prompt", {}, new AbortController().signal),
       /valid structured copy/,
     );
+    await assert.rejects(
+      provider.complete(
+        "system",
+        "x".repeat(100000),
+        {},
+        new AbortController().signal,
+      ),
+      /context budget/,
+    );
     assert.ok(calls.every((url) => url.startsWith("http://127.0.0.1:1234/")));
     assert.equal(calls.length, 2);
   } finally {
     globalThis.fetch = oldFetch;
+  }
+});
+
+test("every supported Python installation lock is pinned, hashed and intact", () => {
+  assert.equal(Object.keys(pythonLocks).length, 5);
+  for (const lock of Object.values(pythonLocks)) {
+    const content = readFileSync(
+      new URL(`../src/main/python-locks/${lock.file}`, import.meta.url),
+    );
+    assert.equal(
+      createHash("sha256").update(content).digest("hex"),
+      lock.sha256,
+    );
+    const requirements = content.toString().split(/\n(?=[a-zA-Z])/);
+    assert.ok(requirements.length > 30);
+    for (const requirement of requirements) {
+      assert.match(requirement, /^[a-zA-Z\d_.-]+==[^\s]+/);
+      assert.match(requirement, /--hash=sha256:[a-f0-9]{64}/);
+    }
+    assert.match(content.toString(), /torch==2\.9\.1/);
   }
 });
 

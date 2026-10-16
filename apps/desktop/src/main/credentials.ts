@@ -45,8 +45,12 @@ export class Credentials {
     return this.secure;
   }
   names() {
-    return ["openrouter", "fal", "mailchimp"].filter((name) =>
-      Boolean(this.get(name)),
-    );
+    return ["openrouter", "fal", "mailchimp"].filter((name) => {
+      try {
+        return Boolean(this.get(name));
+      } catch {
+        return false;
+      } // A locked credential store must not block manual authoring.
+    });
   }
 }

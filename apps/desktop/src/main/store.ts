@@ -40,6 +40,14 @@ export class Store {
     this.assetsDir = join(directory, "assets");
     mkdirSync(this.assetsDir, { recursive: true });
     this.db = new DatabaseSync(join(directory, "newsletter.sqlite"));
+    if (
+      Number(this.db.prepare("PRAGMA user_version").get()?.user_version) > 1
+    ) {
+      this.db.close();
+      throw new Error(
+        "This library was created by a newer version. Update NewsletterCreator before opening it.",
+      );
+    }
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
       CREATE TABLE IF NOT EXISTS profiles(id TEXT PRIMARY KEY, revision INTEGER NOT NULL, json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS issues(id TEXT PRIMARY KEY, profile_id TEXT NOT NULL REFERENCES profiles(id), revision INTEGER NOT NULL, json TEXT NOT NULL);

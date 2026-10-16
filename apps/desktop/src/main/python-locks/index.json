@@ -1,0 +1,22 @@
+{
+  "darwin-arm64-metal": {
+    "file": "darwin-arm64-metal.txt",
+    "sha256": "dce9b658dcfaf41a7e7867c40f0d479b230267bc17ff8d01dbe0ae2e3877b834"
+  },
+  "linux-x64-cpu": {
+    "file": "linux-x64-cpu.txt",
+    "sha256": "cea120db4b92f672e707722ccc3705c133ecd11fd988696f685c672521cfe330"
+  },
+  "linux-x64-cu128": {
+    "file": "linux-x64-cu128.txt",
+    "sha256": "3cc39af8615b02ab3deb57e38e271cdb34ddc77242984ea9b2e9549e5fd651cc"
+  },
+  "win32-x64-cpu": {
+    "file": "win32-x64-cpu.txt",
+    "sha256": "5e9042be0b0bb8fb9518270a139ddfc5f97fcff0e248f560d8f299727463b74a"
+  },
+  "win32-x64-cu128": {
+    "file": "win32-x64-cu128.txt",
+    "sha256": "1d7b184e4d63ee0db872770c843973442efd80e38840004882084a116b26a19d"
+  }
+}

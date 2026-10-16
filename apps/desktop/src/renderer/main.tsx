@@ -5,6 +5,8 @@ import {
   newIssue,
   newProfile,
   renderEmail,
+  undoEdit,
+  type UndoEdit,
   type Article,
   type Block,
   type DesktopApi,
@@ -52,7 +54,7 @@ function App() {
   const [jobId, setJobId] = useState("");
   const [saveState, setSaveState] = useState("Saved on this computer");
   const [assets, setAssets] = useState<Record<string, string>>({});
-  const [undo, setUndo] = useState<Issue[]>([]);
+  const [undo, setUndo] = useState<UndoEdit[]>([]);
   const [outcomes, setOutcomes] = useState<SourceOutcome[]>([]);
   const [setup, setSetup] = useState<SetupStatus>();
   const latest = useRef<Issue | undefined>(undefined);
@@ -155,7 +157,10 @@ function App() {
     if (remember && latest.current)
       setUndo((history) => [
         ...history.slice(-19),
-        structuredClone(latest.current!),
+        {
+          before: structuredClone(latest.current!),
+          after: structuredClone(next),
+        },
       ]);
     latest.current = next;
     setIssue(next);
@@ -218,7 +223,13 @@ function App() {
     await reload();
   }
   async function saveProfile(value: Profile) {
+    await flush();
     const saved = await api.invoke("saveProfile", value);
+    if (latest.current && latest.current.profileId !== saved.id) {
+      latest.current = undefined;
+      setIssue(undefined);
+      setUndo([]);
+    }
     setProfileId(saved.id);
     await reload();
     setStatus("Newsletter settings saved.");
@@ -823,10 +834,7 @@ function App() {
                         onClick={() => {
                           const previous = undo.at(-1)!;
                           setUndo(undo.slice(0, -1));
-                          change({
-                            ...previous,
-                            revision: latest.current!.revision,
-                          });
+                          change(undoEdit(latest.current!, previous));
                         }}
                       >
                         ↶ Undo
@@ -1298,6 +1306,26 @@ function ProfileEditor({
           )}
           {profile && (
             <button
+              disabled={busy}
+              onClick={() =>
+                void save({
+                  ...value,
+                  id: crypto.randomUUID(),
+                  name: `${value.name} (copy)`,
+                  revision: 0,
+                  legacyImport: undefined,
+                  sources: value.sources.map((source) => ({
+                    ...source,
+                    id: crypto.randomUUID(),
+                  })),
+                })
+              }
+            >
+              Duplicate newsletter
+            </button>
+          )}
+          {profile && (
+            <button
               className="danger text-button"
               disabled={busy}
               onClick={() =>
@@ -1340,6 +1368,7 @@ function SourceManager({
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [type, setType] = useState<"rss" | "website" | "article">("rss");
+  const [editingId, setEditingId] = useState("");
   return (
     <details className="panel source-manager" open={!profile.sources.length}>
       <summary>
@@ -1369,6 +1398,18 @@ function SourceManager({
               <small>{source.url}</small>
             </div>
             <span className="pill muted">{source.type}</span>
+            <button
+              disabled={busy}
+              aria-label={`Edit ${source.name}`}
+              onClick={() => {
+                setEditingId(source.id);
+                setName(source.name);
+                setUrl(source.url);
+                setType(source.type);
+              }}
+            >
+              Edit
+            </button>
             <button
               disabled={busy}
               aria-label={`Remove ${source.name}`}
@@ -1416,20 +1457,39 @@ function SourceManager({
           onClick={() =>
             void save({
               ...profile,
-              sources: [
-                ...profile.sources,
-                { id: crypto.randomUUID(), name, url, type, enabled: true },
-              ],
+              sources: editingId
+                ? profile.sources.map((source) =>
+                    source.id === editingId
+                      ? { ...source, name, url, type }
+                      : source,
+                  )
+                : [
+                    ...profile.sources,
+                    { id: crypto.randomUUID(), name, url, type, enabled: true },
+                  ],
             }).then((saved) => {
               if (saved) {
                 setName("");
                 setUrl("");
+                setEditingId("");
               }
             })
           }
         >
-          Add source
+          {editingId ? "Save source" : "Add source"}
         </button>
+        {editingId && (
+          <button
+            disabled={busy}
+            onClick={() => {
+              setEditingId("");
+              setName("");
+              setUrl("");
+            }}
+          >
+            Cancel edit
+          </button>
+        )}
       </div>
     </details>
   );
@@ -2035,9 +2095,16 @@ function SetupPanel({
           <p>
             {status
               ? `${status.hardware.platform} / ${status.hardware.arch} · ${status.hardware.memoryGB} GB memory · ${status.hardware.freeDiskGB} GB free`
-              : "Check your computer and local engine connections."}
+              : "Check your computer and local engine connections. Managed Apple Silicon setup requires macOS 14 or later."}
           </p>
           <small>{status?.hardware.gpu}</small>
+          {status?.hardware.gpu.includes("CPU") && (
+            <p>
+              No supported GPU acceleration was detected. Manual writing and
+              image uploads work normally. CPU image generation can be very
+              slow; you can connect an existing compatible engine in Settings.
+            </p>
+          )}
         </div>
         <button disabled={busy} onClick={refresh}>
           Check again
@@ -2135,7 +2202,7 @@ function SetupPanel({
           and models for my own use.
         </label>
         <p>
-          Allow at least 8 GB free for text setup and 20 GB for image setup.
+          Allow at least 8 GB free for text setup and 30 GB for image setup.
           Downloads can be large. Setup installs isolated Python tooling and
           never changes GPU drivers. Existing engines are reused without
           replacing their settings. LM Studio maintains its own standard runtime

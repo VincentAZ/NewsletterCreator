@@ -71,6 +71,17 @@ export function textProvider(
         throw new Error(
           "Choose a text model in Settings or finish local setup.",
         );
+      const outputTokens = Math.min(
+        2048,
+        Math.floor(settings.contextTokens / 3),
+      );
+      if (
+        Buffer.byteLength(system + prompt) >
+        (settings.contextTokens - outputTokens - 512) * 2
+      )
+        throw new Error(
+          "The request exceeds the configured context budget. Choose fewer sources or a larger tested context limit.",
+        );
       const payload = await jsonRequest(
         base + "/chat/completions",
         {
@@ -84,7 +95,7 @@ export function textProvider(
               { role: "user", content: prompt },
             ],
             temperature: 0.3,
-            max_tokens: Math.min(2048, Math.floor(settings.contextTokens / 3)),
+            max_tokens: outputTokens,
             response_format: {
               type: "json_schema",
               json_schema: { name: "newsletter", strict: true, schema },

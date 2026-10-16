@@ -71,9 +71,14 @@ export function createHandlers(
     generate: ({ jobId, issueId, blockId, feedback }) =>
       jobs.run(
         jobId,
-        (signal) => {
+        (signal, report) => {
           const issue = store.issue(issueId);
           const settings = store.settings();
+          report(
+            settings.textProvider === "local"
+              ? "Writing with your local model…"
+              : "Writing with OpenRouter…",
+          );
           return generateCopy(
             textProvider(settings, secrets),
             settings,
@@ -91,11 +96,17 @@ export function createHandlers(
         jobId,
         async (signal, report) => {
           const settings = store.settings();
-          const bytes = await imageProvider(settings, secrets).generate(
-            `${settings.imagePrompt}\n${prompt}`,
-            signal,
-            report,
-          );
+          const bytes = await imageProvider(settings, secrets)
+            .generate(`${settings.imagePrompt}\n${prompt}`, signal, report)
+            .catch((error: unknown) => {
+              if (
+                signal.aborted &&
+                settings.imageProvider === "local" &&
+                engines.owns("image")
+              )
+                engines.stop("image"); // Release our own process; never interrupt an existing shared engine.
+              throw error;
+            });
           return { assetId: store.putImage(bytes) };
         },
         true,
