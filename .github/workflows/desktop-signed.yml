@@ -13,7 +13,7 @@ jobs:
             target: --win --x64
             certificate: WIN_CSC_LINK
             password: WIN_CSC_KEY_PASSWORD
-          - os: macos-14
+          - os: macos-15
             target: --mac --arm64
             certificate: MAC_CSC_LINK
             password: MAC_CSC_KEY_PASSWORD

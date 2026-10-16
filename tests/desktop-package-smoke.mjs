@@ -1,5 +1,5 @@
 import { _electron as electron, expect } from "@playwright/test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -18,14 +18,21 @@ try {
     executablePath: resolve(
       process.argv[2] || `apps/desktop/release/${packagedExecutable}`,
     ),
-    args: ["--no-sandbox", `--user-data-dir=${directory}`],
+    args: [
+      ...(process.platform === "linux" &&
+      process.env.NEWSLETTER_PACKAGE_NATIVE_SANDBOX !== "1"
+        ? ["--no-sandbox"]
+        : []),
+      `--user-data-dir=${directory}`,
+    ],
     env: testEnv,
   });
   const info = await app.evaluate(({ app }) => ({
     packaged: app.isPackaged,
     directory: app.getPath("userData"),
   }));
-  expect(info).toEqual({ packaged: true, directory });
+  expect(info.packaged).toBe(true);
+  expect(realpathSync(info.directory)).toBe(realpathSync(directory));
   const page = await app.firstWindow();
   await expect(page.getByText("A good newsletter starts here.")).toBeVisible();
   const library = await page.evaluate(() =>

@@ -80,7 +80,7 @@ try {
   if (!issue) {
     const assetId = store.putImage(
       Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWTkAAAAASUVORK5CYII=",
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNwaHAAAAIEAQFd/gSVAAAAAElFTkSuQmCC",
         "base64",
       ),
     );
