@@ -24,13 +24,19 @@ export const DEFAULT_NEWS_SOURCES: NewsSource[] = [
 export async function gatherArticles(
   sources: NewsSource[] = DEFAULT_NEWS_SOURCES,
   options: ScrapeOptions = {},
-): Promise<{ articles: Article[]; sourceCount: number }> {
+): Promise<{ articles: Article[]; sourceCount: number; sourceResults: Array<{ id: string; name: string; count: number; error?: string }> }> {
   const enabledSources = normalizeSources(sources).filter((source) => source.enabled);
   const results = await Promise.allSettled(enabledSources.map((source) => fetchSource(source, options)));
   const articles = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
   return {
     articles: dedupeArticles(articles).filter((a) => !a.published || ageInDays(a.published) <= 3).sort((a, b) => b.score - a.score).slice(0, 60),
-    sourceCount: enabledSources.length,
+    sourceCount: results.filter((result) => result.status === "fulfilled").length,
+    sourceResults: results.map((result, index) => ({
+      id: enabledSources[index].id,
+      name: enabledSources[index].name,
+      count: result.status === "fulfilled" ? result.value.length : 0,
+      ...(result.status === "rejected" ? { error: result.reason instanceof Error ? result.reason.message : "Source failed." } : {}),
+    })),
   };
 }
 

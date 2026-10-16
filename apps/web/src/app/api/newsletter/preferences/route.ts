@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPreferences, isPreferencesConfigured, savePreferences } from "@/lib/newsletter/preferences";
+import { getPreferences, isPreferencesConfigured, savePreferences, PreferenceConflictError } from "@/lib/newsletter/preferences";
 import type { NewsSource, PromptSet } from "@/lib/newsletter/types";
 
 export async function GET(request: Request) {
@@ -29,6 +29,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   const body = (await request.json()) as {
     preferenceId?: string;
+    expectedRevision?: number;
     sources?: NewsSource[];
     copyModel?: string;
     scrapeModel?: string;
@@ -46,11 +47,16 @@ export async function PUT(request: Request) {
     return NextResponse.json({ configured: true, error: "preferenceId is required" }, { status: 400 });
   }
 
+  if (!Number.isSafeInteger(body.expectedRevision) || (body.expectedRevision ?? -1) < 0) {
+    return NextResponse.json({ error: "expectedRevision is required" }, { status: 400 });
+  }
+
   try {
     return NextResponse.json({
       configured: true,
       preferences: await savePreferences({
         preferenceId: body.preferenceId,
+        expectedRevision: body.expectedRevision!,
         sources: Array.isArray(body.sources) ? body.sources : [],
         copyModel: body.copyModel ?? "",
         scrapeModel: body.scrapeModel ?? "",
@@ -67,7 +73,7 @@ export async function PUT(request: Request) {
         preferences: null,
         error: error instanceof Error ? error.message : "Unable to save preferences.",
       },
-      { status: 500 },
+      { status: error instanceof PreferenceConflictError ? 409 : 500 },
     );
   }
 }

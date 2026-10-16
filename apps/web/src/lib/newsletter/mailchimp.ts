@@ -7,17 +7,6 @@ type MailchimpConfig = {
   listId: string;
   fromName: string;
   replyTo: string;
-  template?: MailchimpTemplateConfig;
-};
-
-type MailchimpTemplateConfig = {
-  id: number;
-  sections: {
-    preheader: string;
-    intro: string;
-    heroImage: string;
-    body: string;
-  };
 };
 
 type MailchimpCampaignResponse = {
@@ -39,12 +28,6 @@ type MailchimpChecklistResponse = {
 
 type MailchimpCampaignContentResponse = {
   html?: string;
-};
-
-type MailchimpTemplateResponse = {
-  id?: number;
-  name?: string;
-  content_type?: string;
 };
 
 export function isMailchimpConfigured() {
@@ -107,7 +90,6 @@ function getMailchimpConfig(): MailchimpConfig {
   const server = process.env.MAILCHIMP_SERVER || apiKey?.split("-").at(-1);
   const fromName = process.env.MAILCHIMP_FROM_NAME?.trim();
   const replyTo = normalizeMailchimpReplyTo(process.env.MAILCHIMP_REPLY_TO);
-  const templateId = parseMailchimpTemplateId(process.env.MAILCHIMP_TEMPLATE_ID);
 
   if (!apiKey) {
     throw new Error("MAILCHIMP_API_KEY is not configured.");
@@ -131,32 +113,8 @@ function getMailchimpConfig(): MailchimpConfig {
     listId,
     fromName,
     replyTo,
-    template: templateId
-      ? {
-          id: templateId,
-          sections: {
-            preheader: process.env.MAILCHIMP_SECTION_PREHEADER?.trim() || "preheader",
-            intro: process.env.MAILCHIMP_SECTION_INTRO?.trim() || "intro",
-            heroImage: process.env.MAILCHIMP_SECTION_HERO_IMAGE?.trim() || "hero_image",
-            body: process.env.MAILCHIMP_SECTION_BODY?.trim() || "body",
-          },
-        }
-      : undefined,
+
   };
-}
-
-function parseMailchimpTemplateId(value: string | undefined) {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  const templateId = Number(trimmed);
-  if (!Number.isInteger(templateId) || templateId <= 0) {
-    throw new Error("MAILCHIMP_TEMPLATE_ID must be a positive numeric template id.");
-  }
-
-  return templateId;
 }
 
 export function normalizeMailchimpReplyTo(value: string | undefined) {
@@ -173,43 +131,8 @@ export function normalizeMailchimpReplyTo(value: string | undefined) {
   return trimmed;
 }
 
-export function buildMailchimpCampaignContent(
-  draft: NewsletterDraft,
-  image: GeneratedImage,
-  template?: MailchimpTemplateConfig,
-) {
-  if (template) {
-    return {
-      template: {
-        id: template.id,
-        sections: buildMailchimpTemplateSections(draft, image, template.sections),
-      },
-      plain_text: renderNewsletterText(draft),
-    };
-  }
-
-  return {
-    html: renderNewsletterHtml(draft, image),
-    plain_text: renderNewsletterText(draft),
-  };
-}
-
-async function validateMailchimpTemplate(config: MailchimpConfig, templateId: number) {
-  const template = await mailchimpFetch<MailchimpTemplateResponse>(config, `/templates/${templateId}`, {
-    method: "GET",
-  });
-
-  if (template.content_type === "multichannel") {
-    throw new Error(
-      `MAILCHIMP_TEMPLATE_ID ${templateId} (${template.name ?? "unnamed template"}) is a multichannel/New Builder template. Mailchimp's Marketing API does not expose editable HTML sections for this template type, so the app cannot populate it without creating the wrong layout. Recreate it as a Classic coded template with mc:edit sections, or remove MAILCHIMP_TEMPLATE_ID to use the app's HTML layout.`,
-    );
-  }
-
-  if (template.content_type !== "html") {
-    throw new Error(
-      `MAILCHIMP_TEMPLATE_ID ${templateId} (${template.name ?? "unnamed template"}) has unsupported content_type "${template.content_type ?? "unknown"}". Use a Classic coded HTML template with mc:edit sections.`,
-    );
-  }
+export function buildMailchimpCampaignContent(draft: NewsletterDraft, image: GeneratedImage) {
+  return { html: renderNewsletterHtml(draft, image), plain_text: renderNewsletterText(draft) };
 }
 
 async function setCampaignContent(
@@ -232,18 +155,6 @@ async function setCampaignContent(
   }
 }
 
-function buildMailchimpTemplateSections(
-  draft: NewsletterDraft,
-  image: GeneratedImage,
-  sectionNames: MailchimpTemplateConfig["sections"],
-) {
-  return {
-    [sectionNames.preheader]: escapeHtml(draft.preheader),
-    [sectionNames.intro]: renderIntroHtml(draft),
-    [sectionNames.heroImage]: renderHeroImageHtml(image, draft.subject),
-    [sectionNames.body]: renderSectionsHtml(draft),
-  };
-}
 
 function hasGeneratedNewsletterContent(html: string, draft: NewsletterDraft) {
   const normalizedHtml = normalizeContentText(stripHtmlTags(html));
@@ -440,7 +351,7 @@ function renderNewsletterText(draft: NewsletterDraft) {
     })
     .join("\n\n");
 
-  return `${draft.subject}\n\n${draft.preheader}\n\n${draft.intro}\n\n${sectionText}\n\nExplore the Learning Center: https://www.example.com\n\nReserve Your 1:1 Expert Training: https://www.example.com/training\n\n© 2026 Serpico AI Learning Center · Phoenix, AZ`;
+  return `${draft.subject}\n\n${draft.preheader}\n\n${draft.intro}${draft.nextAma?.trim() ? `\n\n${draft.nextAma.trim()}` : ""}\n\n${sectionText}\n\nExplore the Learning Center: https://www.example.com\n\nReserve Your 1:1 Expert Training: https://www.example.com/training\n\n© 2026 Serpico AI Learning Center · Phoenix, AZ`;
 }
 
 function escapeHtml(value: string) {

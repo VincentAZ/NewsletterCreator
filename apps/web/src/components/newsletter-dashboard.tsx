@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveQueue } from "@/lib/newsletter/save-queue";
 import { ChangeEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import type {
   Article,
@@ -35,6 +36,7 @@ type ModelsPayload = {
 type ArticlesPayload = {
   articles: Article[];
   sourceCount: number;
+  sourceResults: Array<{ id: string; name: string; count: number; error?: string }>;
   sources?: NewsSource[];
   error?: string;
   balances: Balances;
@@ -130,7 +132,7 @@ const helpText = {
   heroImage:
     "After copy is generated, edit the image prompt or feedback, choose an image model, then click Generate image.",
   mailchimp:
-    "Creates a draft campaign in the single Mailchimp template configured in .env after copy and image are ready.",
+    "Creates a Mailchimp draft using the app’s branded HTML after copy and image are ready.",
 };
 
 export function NewsletterDashboard() {
@@ -169,7 +171,30 @@ export function NewsletterDashboard() {
   const [preferenceId, setPreferenceId] = useState("");
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const lastSavedPreferences = useRef("");
-  const preferenceSaveSequence = useRef(0);
+  const [preferenceLoadError, setPreferenceLoadError] = useState(false);
+  const [preferenceLoadAttempt, setPreferenceLoadAttempt] = useState(0);
+  const preferenceRevision = useRef(0);
+  const preferenceWritesBlocked = useRef(true);
+  const preferenceSaveTimer = useRef<number | undefined>(undefined);
+  const preferenceSaveQueue = useRef<SaveQueue<Record<string, unknown>, PreferencesPayload> | null>(null);
+  if (!preferenceSaveQueue.current) {
+    preferenceSaveQueue.current = new SaveQueue(async (snapshot) => {
+      if (preferenceWritesBlocked.current) throw new Error("Reload preferences before saving.");
+      try {
+        const payload = await putJson<PreferencesPayload>("/api/newsletter/preferences", {
+          ...snapshot, expectedRevision: preferenceRevision.current,
+        });
+        if (!payload.configured || !payload.preferences) throw new Error(payload.error || "Preference storage is unavailable.");
+        preferenceRevision.current = payload.preferences.revision;
+        return payload;
+      } catch (error) {
+        preferenceWritesBlocked.current = true;
+        setPreferencesLoaded(false);
+        setPreferenceLoadError(true);
+        throw error;
+      }
+    });
+  }
 
   const selectedArticles = useMemo(() => {
     return articles.filter((article) => selectedArticleIds.has(article.id));
@@ -249,6 +274,9 @@ export function NewsletterDashboard() {
     let isMounted = true;
 
     async function loadInitialState() {
+      preferenceWritesBlocked.current = true;
+      setPreferencesLoaded(false);
+      setPreferenceLoadError(false);
       const { preferenceId: id, legacyPreferenceId } = getPreferenceIdentity();
       setPreferenceId(id);
 
@@ -268,7 +296,9 @@ export function NewsletterDashboard() {
         }
       }
 
-      if (preferences?.sources.length) {
+      if (!isMounted) return;
+      preferenceRevision.current = shouldMigrateLegacyPreferences ? 0 : preferences?.revision ?? 0;
+      if (preferences) {
         setSources(normalizeDashboardSources(preferences.sources));
       }
       if (preferences?.copyModel) {
@@ -303,7 +333,7 @@ export function NewsletterDashboard() {
       }
       lastSavedPreferences.current = preferences && !shouldMigrateLegacyPreferences
         ? serializePreferences({
-            sources: preferences.sources.length ? preferences.sources : defaultNewsSources,
+            sources: preferences.sources,
             copyModel: preferences.copyModel ?? "",
             scrapeModel: preferences.scrapeModel ?? "",
             imageModel: preferences.imageModel ?? "",
@@ -313,10 +343,11 @@ export function NewsletterDashboard() {
           })
         : "";
 
-      const payload = await fetchJson<{ balances: Balances }>("/api/newsletter/balances");
+      const payload = await fetchJson<{ balances: Balances }>("/api/newsletter/balances").catch(() => ({ balances: emptyBalances }));
       if (isMounted) {
         setBalances(payload.balances);
-        setPreferencesLoaded(true);
+        preferenceWritesBlocked.current = !preferencesPayload.configured;
+        setPreferencesLoaded(preferencesPayload.configured);
         if (!preferencesPayload.configured) {
           setStatus("Supabase is required to persist dashboard preferences. Add Supabase env vars and run the schema script.");
         } else if (preferencesPayload.error) {
@@ -327,7 +358,8 @@ export function NewsletterDashboard() {
 
     void loadInitialState().catch(() => {
       if (isMounted) {
-        setPreferencesLoaded(true);
+        setPreferencesLoaded(false);
+        setPreferenceLoadError(true);
         setStatus("Database preferences failed to load. Check Supabase configuration and schema.");
       }
     });
@@ -335,7 +367,7 @@ export function NewsletterDashboard() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [preferenceLoadAttempt]);
 
   useEffect(() => {
     if (!preferencesLoaded || !preferenceId) {
@@ -356,35 +388,13 @@ export function NewsletterDashboard() {
       return;
     }
 
-    const saveVersion = ++preferenceSaveSequence.current;
-    const timeout = window.setTimeout(() => {
-      void putJson<PreferencesPayload>("/api/newsletter/preferences", {
-        preferenceId,
-        ...preferences,
-      })
-        .then((payload) => {
-          if (saveVersion !== preferenceSaveSequence.current) {
-            return;
-          }
-          if (!payload.configured) {
-            setStatus("Supabase is required to persist dashboard preferences. Add Supabase env vars and run the schema script.");
-            return;
-          }
-          if (payload.error) {
-            setStatus(payload.error);
-            return;
-          }
-          lastSavedPreferences.current = serialized;
-        })
-        .catch(() => {
-          if (saveVersion !== preferenceSaveSequence.current) {
-            return;
-          }
-          setStatus("Database preferences failed to save. Check Supabase configuration and schema.");
-        });
+    preferenceSaveTimer.current = window.setTimeout(() => {
+      void preferenceSaveQueue.current!.enqueue({ preferenceId, ...preferences })
+        .then(() => { lastSavedPreferences.current = serialized; })
+        .catch((error: unknown) => setStatus(error instanceof Error ? error.message : "Preferences failed to save."));
     }, 600);
+    return () => window.clearTimeout(preferenceSaveTimer.current);
 
-    return () => window.clearTimeout(timeout);
   }, [copyModel, currentPromptSet, imageModel, preferenceId, preferencesLoaded, promptSets, scrapeModel, selectedPromptSetId, sources]);
 
   async function loadModels() {
@@ -429,22 +439,28 @@ export function NewsletterDashboard() {
     }
 
     setIsBusy(true);
-    setStatus("Gathering and deduping newsletter sources.");
-    const payload = await postJson<ArticlesPayload>("/api/newsletter/articles", {
-      sources,
-      scrapeModel,
-      scrapeSystemPrompt,
-      scrapeTaskPrompt,
-    });
-    setArticles(payload.articles);
-    setSelectedArticleIds(new Set(payload.articles.slice(0, 30).map((article) => article.id)));
-    setSources(payload.sources?.length ? payload.sources : sources);
-    setBalances(payload.balances);
-    setStatus(
-      payload.error ??
-        `Loaded ${payload.articles.length} deduped stories from ${payload.sourceCount} sources. Review the selected stories, then click Generate copy.`,
-    );
-    setIsBusy(false);
+    try {
+      setStatus("Gathering and deduping newsletter sources.");
+      const payload = await postJson<ArticlesPayload>("/api/newsletter/articles", {
+        sources,
+        scrapeModel,
+        scrapeSystemPrompt,
+        scrapeTaskPrompt,
+      });
+      if (payload.error) throw new Error(payload.error + " " + payload.sourceResults.filter((source) => source.error).map((source) => `${source.name}: ${source.error}`).join("; "));
+      setArticles(payload.articles);
+      setSelectedArticleIds(new Set(payload.articles.slice(0, 30).map((article) => article.id)));
+      setSources(payload.sources?.length ? payload.sources : sources);
+      setBalances(payload.balances);
+      setStatus(
+        payload.error ??
+          `Loaded ${payload.articles.length} stories from ${payload.sourceCount} sources. ${payload.sourceResults.filter((source) => source.error).map((source) => `${source.name}: ${source.error}`).join("; ")}`,
+      );
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Request failed. Please retry.");
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   async function generateDraft(target?: string) {
@@ -453,30 +469,35 @@ export function NewsletterDashboard() {
     }
 
     setIsBusy(true);
-    setStatus(target ? `Regenerating ${target}.` : "Generating newsletter copy with OpenRouter.");
-    const payload = await postJson<DraftPayload>("/api/newsletter/draft", {
-      model: copyModel,
-      articles: selectedArticles,
-      feedback: target ? sectionFeedback(target) || globalFeedback : globalFeedback,
-      previousDraft: draft,
-      systemPrompt: copySystemPrompt,
-      taskPrompt: copyTaskPrompt,
-      target,
-    });
+    try {
+      setStatus(target ? `Regenerating ${target}.` : "Generating newsletter copy with OpenRouter.");
+      const payload = await postJson<DraftPayload>("/api/newsletter/draft", {
+        model: copyModel,
+        articles: selectedArticles,
+        feedback: target ? sectionFeedback(target) || globalFeedback : globalFeedback,
+        previousDraft: draft,
+        systemPrompt: copySystemPrompt,
+        taskPrompt: copyTaskPrompt,
+        target,
+      });
 
-    if (payload.error) {
-      setStatus(payload.error);
-    } else {
-      setDraft(payload.draft);
-      setStatus(
-        payload.usedFallback
-          ? "Draft created with local fallback. Review sections, then generate the image."
-          : "Draft created. Review sections, then generate the image.",
-      );
+      if (payload.error) {
+        setStatus(payload.error);
+      } else {
+        setDraft(payload.draft);
+        setStatus(
+          payload.usedFallback
+            ? "Draft created with local fallback. Review sections, then generate the image."
+            : "Draft created. Review sections, then generate the image.",
+        );
+      }
+
+      setBalances(payload.balances);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Request failed. Please retry.");
+    } finally {
+      setIsBusy(false);
     }
-
-    setBalances(payload.balances);
-    setIsBusy(false);
   }
 
   async function generateImage() {
@@ -518,7 +539,7 @@ export function NewsletterDashboard() {
 
     setIsBusy(true);
     try {
-      setStatus("Creating a Mailchimp draft campaign and populating the template.");
+      setStatus("Creating a Mailchimp draft campaign and uploading the newsletter.");
 
       const payload = await postJson<MailchimpPayload>("/api/newsletter/mailchimp", {
         draft,
@@ -530,10 +551,10 @@ export function NewsletterDashboard() {
         const checklist = payload.campaign.checklist?.length ? ` Mailchimp still reports: ${payload.campaign.checklist.join(" ")}` : "";
         setStatus(`Mailchimp draft created: ${payload.campaign.title}. Review it in Mailchimp before sending.${checklist}`);
       } else {
-        setStatus(payload.error ?? "Mailchimp template population failed.");
+        setStatus(payload.error ?? "Mailchimp draft creation failed.");
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Mailchimp template population failed.");
+      setStatus(error instanceof Error ? error.message : "Mailchimp draft creation failed.");
     } finally {
       setIsBusy(false);
     }
@@ -677,7 +698,6 @@ export function NewsletterDashboard() {
       if (!saved) {
         return;
       }
-      setPromptSets(nextPromptSets);
       setStatus(`${label} saved.`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : `${label} save failed.`);
@@ -726,7 +746,6 @@ export function NewsletterDashboard() {
       if (!saved) {
         return false;
       }
-      setPromptSets(nextPromptSets);
       setStatus(`${nextName} renamed.`);
       return true;
     } catch (error) {
@@ -761,7 +780,6 @@ export function NewsletterDashboard() {
       if (!saved) {
         return false;
       }
-      setPromptSets(nextPromptSets);
       if (nextLastPromptSetId !== selectedPromptSetId) {
         setSelectedPromptSetId("");
       }
@@ -796,22 +814,12 @@ export function NewsletterDashboard() {
       lastPromptSetId: selectedPromptSetId,
       ...overrides,
     };
-    const saveVersion = ++preferenceSaveSequence.current;
-    const payload = await putJson<PreferencesPayload>("/api/newsletter/preferences", {
-      preferenceId: id,
-      ...preferences,
-    });
-
-    if (saveVersion !== preferenceSaveSequence.current) {
-      return false;
-    }
-
-    if (!payload.configured) {
-      throw new Error("Supabase is required to save prompts. Add Supabase env vars and run the schema script.");
-    }
-    if (payload.error) {
-      throw new Error(payload.error);
-    }
+    if (!preferencesLoaded || preferenceWritesBlocked.current) throw new Error("Load preferences successfully before saving.");
+    window.clearTimeout(preferenceSaveTimer.current);
+    // Apply manual edits before subsequent autosaves take their snapshots.
+    if (overrides.promptSets) setPromptSets(overrides.promptSets);
+    if (overrides.lastPromptSetId !== undefined) setSelectedPromptSetId(overrides.lastPromptSetId);
+    await preferenceSaveQueue.current!.enqueue({ preferenceId: id, ...preferences });
 
     lastSavedPreferences.current = serializePreferences(preferences);
     setStatus("Preferences saved.");
@@ -1020,7 +1028,8 @@ export function NewsletterDashboard() {
         </div>
       </section>
 
-      <p className="statusLine">{status}</p>
+      <p className="statusLine" role="status">{status}</p>
+      {preferenceLoadError ? <button type="button" onClick={() => setPreferenceLoadAttempt((attempt) => attempt + 1)}>Reload saved preferences</button> : null}
       <StepBar currentStep={currentStep} />
 
       <main className="workspace">
@@ -1439,7 +1448,7 @@ export function NewsletterDashboard() {
           <section className="mailchimpPanel">
             <div className="sectionHeader">
               <div className="sectionTitle">
-                <h3>Mailchimp Template</h3>
+                <h3>Mailchimp Draft</h3>
                 <HelpButton label="Mailchimp template help">{helpText.mailchimp}</HelpButton>
               </div>
             </div>

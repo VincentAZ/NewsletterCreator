@@ -19,7 +19,11 @@ export async function POST(request: Request) {
 async function respondWithArticles(sources: NewsSource[], options: { scrapeModel?: string; scrapeSystemPrompt?: string; scrapeTaskPrompt?: string }) {
   const balancesPromise = getBalances();
   try {
-    return NextResponse.json({ ...(await gatherArticles(sources, options)), sources, balances: await balancesPromise });
+    const result = await gatherArticles(sources, options);
+    const allFailed = result.sourceResults.length > 0 && result.sourceCount === 0;
+    return NextResponse.json({ ...result, sources, balances: await balancesPromise,
+      ...(allFailed ? { error: "Every source failed. Check the source errors and retry." } : {}),
+    });
   } catch (error) {
     return NextResponse.json(
       {

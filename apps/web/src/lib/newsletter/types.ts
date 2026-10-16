@@ -117,6 +117,7 @@ export type MailchimpCampaignDraft = {
 };
 
 export type NewsletterPreferences = {
+  revision: number;
   preferenceId: string;
   sources: NewsSource[];
   copyModel: string;

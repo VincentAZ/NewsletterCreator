@@ -6,9 +6,18 @@
     "build": "npm run build --workspace apps/web",
     "typecheck": "npm run typecheck --workspace apps/web",
     "lint": "npm run lint --workspace apps/web",
-    "db:ensure-schema": "node scripts/ensure-supabase-schema.mjs"
+    "db:ensure-schema": "node scripts/ensure-supabase-schema.mjs",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:e2e": "playwright test"
   },
   "workspaces": [
     "apps/web"
-  ]
+  ],
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
+    "eslint": "^10.12.0",
+    "tsx": "^4.23.15",
+    "typescript-eslint": "^8.71.2"
+  }
 }

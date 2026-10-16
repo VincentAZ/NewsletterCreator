@@ -7,3 +7,8 @@ apps/web/.next
 .env.*.local
 !.env.example
 *.log
+
+test-results/
+playwright-report/
+dist/
+release/

@@ -33,3 +33,7 @@ alter table public.newsletter_preferences
   alter column prompt_sets set not null,
   alter column updated_at set default now(),
   alter column updated_at set not null;
+
+-- Atomic compare-and-swap writes match this revision before updating.
+alter table public.newsletter_preferences
+  add column if not exists revision bigint not null default 1;

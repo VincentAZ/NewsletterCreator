@@ -22,13 +22,8 @@ $env:SUPABASE_DB_URL = "postgresql://postgres..."
 $env:SUPABASE_DB_PASSWORD = "..."
 $env:MAILCHIMP_API_KEY = "..."
 $env:MAILCHIMP_LIST_ID = "..."
-$env:MAILCHIMP_TEMPLATE_ID = "123456"
 $env:MAILCHIMP_FROM_NAME = "Your newsletter"
 $env:MAILCHIMP_REPLY_TO = "newsletter@example.com"
-$env:MAILCHIMP_SECTION_PREHEADER = "preheader"
-$env:MAILCHIMP_SECTION_INTRO = "intro"
-$env:MAILCHIMP_SECTION_HERO_IMAGE = "hero_image"
-$env:MAILCHIMP_SECTION_BODY = "body"
 ```
 
 `FAL_KEY` should be an Admin key if you want the app to display account credits from fal's billing endpoint.
@@ -37,9 +32,13 @@ Supabase is required for persisted dashboard preferences. Custom sources, select
 
 Mailchimp is configured once through `.env`. `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID`, `MAILCHIMP_FROM_NAME`, and `MAILCHIMP_REPLY_TO` are required to create a draft campaign. `MAILCHIMP_REPLY_TO` must be a real sender address Mailchimp accepts for the account. In UI fields that ask for an email address, enter only the address, for example `info@example.com`, not `MAILCHIMP_REPLY_TO=info@example.com`. If `MAILCHIMP_SERVER` is omitted, the app infers it from the API key suffix, for example `us21`.
 
-Set `MAILCHIMP_TEMPLATE_ID` only for a Classic coded Mailchimp template with editable `mc:edit` regions. By default the app fills `preheader`, `intro`, `hero_image`, and `body`; override those names with `MAILCHIMP_SECTION_PREHEADER`, `MAILCHIMP_SECTION_INTRO`, `MAILCHIMP_SECTION_HERO_IMAGE`, and `MAILCHIMP_SECTION_BODY` if your template uses different editable section names. Restart the Next dev server after changing `.env`.
+Mailchimp drafts use the app's full branded HTML and matching plain text. Template IDs and section mappings are not used. Click **Populate Mailchimp** after reviewing the copy and image; the app creates a draft and never sends or schedules it.
 
-Mailchimp New Builder / multichannel templates are not API-populatable by this app. If `MAILCHIMP_TEMPLATE_ID` points to one, the app will stop with an explicit error instead of creating a draft in the wrong layout. After copy and image generation, click `Populate Mailchimp` to create a draft campaign. The app links to the draft inside Mailchimp's admin UI because public campaign/archive URLs are only reliable after sending. The app does not send or schedule campaigns.
+## Private deployment and upgrade
+
+Production runs (including Vercel) require `NEWSLETTER_ADMIN_USER` and a strong `NEWSLETTER_ADMIN_PASSWORD`. The dashboard and API routes use HTTP Basic authentication over HTTPS. Without these values, production access fails closed with HTTP 503. Local development remains accessible without authentication; do not expose the development server publicly.
+
+Before deploying this version, run the schema migration below to add the `revision` column. Existing preferences are preserved. Saves use an atomic revision check; conflicts and failed loads stop autosave until saved preferences are reloaded. Do not run older clients concurrently after upgrading.
 
 Apply or update the Supabase schema:
 
@@ -72,4 +71,4 @@ create table if not exists public.newsletter_preferences (
 5. Generate or regenerate the hero image with the selected fal text-to-image model.
 6. Populate a Mailchimp template as a draft campaign for final review.
 
-Every API response includes refreshed OpenRouter and fal balance data.
+Provider workflow responses include refreshed balance data. Source collection reports per-source failures and keeps successful results.

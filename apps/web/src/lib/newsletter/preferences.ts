@@ -4,6 +4,7 @@ import type { NewsletterPreferences, NewsSource, PromptFieldKey, PromptSet } fro
 
 type PreferenceRow = {
   preference_id: string;
+  revision: number;
   sources: NewsSource[];
   copy_model: string | null;
   scrape_model: string | null;
@@ -16,6 +17,7 @@ type PreferenceRow = {
 
 export type PreferencePayload = {
   preferenceId: string;
+  expectedRevision: number;
   sources: NewsSource[];
   copyModel: string;
   scrapeModel: string;
@@ -61,6 +63,7 @@ export async function savePreferences(payload: PreferencePayload): Promise<Newsl
   const updatedAt = new Date().toISOString();
   const row = {
     preference_id: payload.preferenceId,
+    revision: payload.expectedRevision + 1,
     sources: normalizeSources(payload.sources),
     copy_model: payload.copyModel || null,
     scrape_model: payload.scrapeModel || null,
@@ -70,19 +73,35 @@ export async function savePreferences(payload: PreferencePayload): Promise<Newsl
     last_prompt_set_id: payload.lastPromptSetId || null,
     updated_at: updatedAt,
   };
-  const response = await upsertPreferenceRowWithSchemaFallback(client, row);
+  const response = await fetch(
+    payload.expectedRevision === 0
+      ? `${client.url}/rest/v1/newsletter_preferences?on_conflict=preference_id`
+      : `${client.url}/rest/v1/newsletter_preferences?preference_id=eq.${encodeURIComponent(payload.preferenceId)}&revision=eq.${payload.expectedRevision}`,
+    {
+      method: payload.expectedRevision === 0 ? "POST" : "PATCH",
+      headers: { ...client.headers, "Content-Type": "application/json", Prefer: payload.expectedRevision === 0 ? "resolution=ignore-duplicates,return=representation" : "return=representation" },
+      body: JSON.stringify(row),
+    },
+  );
 
   if (!response.ok) {
     throw new Error(await formatSupabaseError(response, "save"));
   }
 
   const rows = (await response.json()) as PreferenceRow[];
-  return rows[0] ? rowToPreferences(rows[0]) : null;
+  if (!rows[0]) throw new PreferenceConflictError();
+  return rowToPreferences(rows[0]);
+}
+
+export class PreferenceConflictError extends Error {
+  constructor() { super("Preferences changed in another window. Reload preferences before saving again."); }
 }
 
 function rowToPreferences(row: PreferenceRow): NewsletterPreferences {
+  if (!Number.isSafeInteger(row.revision)) throw new Error("Preferences schema needs updating. Run npm run db:ensure-schema before saving.");
   const preferences: NewsletterPreferences = {
     preferenceId: row.preference_id,
+    revision: row.revision,
     sources: normalizeSources(Array.isArray(row.sources) ? row.sources : []),
     copyModel: row.copy_model ?? "",
     scrapeModel: row.scrape_model ?? "",
@@ -101,57 +120,6 @@ type SupabaseRestClient = {
   headers: Record<string, string>;
 };
 
-function upsertPreferenceRow(client: SupabaseRestClient, body: Record<string, unknown>) {
-  return fetch(`${client.url}/rest/v1/newsletter_preferences?on_conflict=preference_id`, {
-    method: "POST",
-    headers: {
-      ...client.headers,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=representation",
-    },
-    body: JSON.stringify(body),
-  });
-}
-
-async function upsertPreferenceRowWithSchemaFallback(client: SupabaseRestClient, row: Record<string, unknown>) {
-  const body = { ...row };
-  const optionalColumns = new Set(["scrape_model", "image_model", "current_prompt_set", "prompt_sets", "last_prompt_set_id"]);
-
-  for (let attempt = 0; attempt < optionalColumns.size + 1; attempt += 1) {
-    const response = await upsertPreferenceRow(client, body);
-    if (response.ok) {
-      return response;
-    }
-
-    const detail = await response.text().catch(() => "");
-    const missingColumn = extractMissingPreferenceColumn(detail);
-    if (!missingColumn || !optionalColumns.has(missingColumn) || !(missingColumn in body)) {
-      return responseFromText(response, detail);
-    }
-
-    delete body[missingColumn];
-  }
-
-  return upsertPreferenceRow(client, body);
-}
-
-function extractMissingPreferenceColumn(detail: string) {
-  const message = parseSupabaseErrorMessage(detail);
-  return (
-    message.match(/column newsletter_preferences\.([a-z_]+) does not exist/i)?.[1] ??
-    message.match(/Could not find the '([a-z_]+)' column of 'newsletter_preferences'/i)?.[1] ??
-    ""
-  );
-}
-
-function responseFromText(response: Response, detail: string) {
-  return new Response(detail, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
-  });
-}
-
 async function formatSupabaseError(response: Response, action: "lookup" | "save") {
   const detail = await response.text().catch(() => "");
   const message = parseSupabaseErrorMessage(detail);
@@ -159,6 +127,7 @@ async function formatSupabaseError(response: Response, action: "lookup" | "save"
   return [
     `Supabase preferences ${action} failed with ${response.status}.`,
     message,
+    lowerMessage.includes("revision") ||
     lowerMessage.includes("scrape_model") ||
     lowerMessage.includes("current_prompt_set") ||
     lowerMessage.includes("prompt_sets") ||
