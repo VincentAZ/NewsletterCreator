@@ -58,6 +58,7 @@ create table if not exists public.newsletter_preferences (
   current_prompt_set jsonb,
   prompt_sets jsonb not null default '[]'::jsonb,
   last_prompt_set_id text,
+  revision bigint not null default 1,
   updated_at timestamptz not null default now()
 );
 ```
@@ -69,6 +70,6 @@ create table if not exists public.newsletter_preferences (
 3. Select stories and generate newsletter copy.
 4. Edit the draft, approve sections, or regenerate with feedback.
 5. Generate or regenerate the hero image with the selected fal text-to-image model.
-6. Populate a Mailchimp template as a draft campaign for final review.
+6. Create a Mailchimp draft containing the generated HTML and matching plain text for final review.
 
 Provider workflow responses include refreshed balance data. Source collection reports per-source failures and keeps successful results.
