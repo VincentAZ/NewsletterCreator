@@ -27,7 +27,7 @@ import {
 } from "./providers";
 import { gather } from "./gather";
 import { exportMailchimp } from "./mailchimp";
-import { jsonRequest, localUrl } from "./network";
+import { fetchPublic, limitedBytes, jsonRequest, localUrl } from "./network";
 
 type Handlers = {
   [K in Command]: (input: Input<K>) => Output[K] | Promise<Output[K]>;
@@ -222,8 +222,21 @@ export function createHandlers(
       profile.topic = "AI news";
       profile.audience = "Business owners and AI practitioners";
       profile.organization = "Serpico AI Learning Center";
-      profile.footer = "Phoenix, AZ";
-      profile.ctaLabel = "Reserve your 1:1 expert training";
+      profile.brandColor = "#0d1b2e";
+      profile.footer =
+        "© 2026 Serpico AI Learning Center · Phoenix, AZ\nhttps://www.example.com";
+      profile.ctaLabel = "Reserve Your 1:1 Expert Training";
+      profile.ctaBody =
+        "Solve your business problem in less than a day.\n\nWe begin with a discovery call. We then pair you with the right specialist to help you build a tailored solution for your business.\n\nNot a course. Not merely learning about AI. It's a real, working tool.";
+      profile.logoAlt = "Serpico AI Learning Center at CEI";
+      // Download the previous hosted logo only during this explicit migration.
+      profile.logoAssetId = store.putImage(
+        await limitedBytes(
+          await fetchPublic(
+            "https://mcusercontent.com/<account-id>/images/0ce7f308-4079-72f1-3d96-c66dd291cc4d.png",
+          ),
+        ),
+      );
       profile.ctaUrl = "https://www.example.com/training";
       profile.freshnessDays = 3;
       profile.sources = rows[0].sources.map((source) => ({

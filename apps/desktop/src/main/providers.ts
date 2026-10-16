@@ -411,11 +411,13 @@ export function imageProvider(
 }
 
 export function referencedAssets(store: Store, issue: Issue) {
-  return Object.fromEntries(
-    issue.blocks
-      .filter((block) => block.assetId)
-      .map((block) => [block.assetId, store.assetData(block.assetId)]),
+  const profile = store.profile(issue.profileId);
+  const ids = new Set(
+    [profile.logoAssetId, ...issue.blocks.map((block) => block.assetId)].filter(
+      Boolean,
+    ),
   );
+  return Object.fromEntries([...ids].map((id) => [id, store.assetData(id)]));
 }
 export function mergeArticles(existing: Article[], incoming: Article[]) {
   const known = new Set(existing.map((article) => article.url));

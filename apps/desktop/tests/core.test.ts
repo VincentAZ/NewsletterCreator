@@ -52,6 +52,12 @@ test("backup roundtrip preserves source material and assets without copying expo
     const assetId = store.putImage(
       Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
     );
+    store.saveProfile({
+      ...profile,
+      logoAssetId: assetId,
+      logoAlt: "Business logo",
+      ctaBody: "Come visit our bakery.",
+    });
     const issue = store.saveIssue({
       ...newIssue(profile.id),
       blocks: [{ ...newBlock("image"), assetId }],
@@ -62,7 +68,13 @@ test("backup roundtrip preserves source material and assets without copying expo
     store.restore(backup);
     assert.equal(store.issues().length, 1);
     assert.ok(store.assetData(store.issues()[0].blocks[0].assetId));
+    assert.equal(
+      store.profiles()[0].logoAssetId,
+      store.issues()[0].blocks[0].assetId,
+    );
+    assert.equal(store.profiles()[0].ctaBody, "Come visit our bakery.");
     assert.deepEqual(store.exportState(issue.id), {});
+    assert.equal(store.backup().assets.length, backup.assets.length);
     assert.throws(
       () =>
         store.restore({
@@ -80,7 +92,14 @@ test("backup roundtrip preserves source material and assets without copying expo
 
 test("email rendering supports unrelated topics, original blocks, escaping, and optional images", () => {
   for (const topic of ["AI news", "Neighborhood gardening", "Bakery updates"]) {
-    const profile = { ...newProfile(topic), topic, organization: "Our group" };
+    const profile = {
+      ...newProfile(topic),
+      topic,
+      organization: "Our group",
+      ctaLabel: "Join us",
+      ctaUrl: "https://example.com",
+      ctaBody: "Come share your ideas.",
+    };
     const issue = {
       ...newIssue(profile.id),
       subject: "This week <script>",
@@ -92,6 +111,8 @@ test("email rendering supports unrelated topics, original blocks, escaping, and 
     const rendered = renderEmail(profile, issue, {}, true);
     assert.ok(rendered.html.includes(topic));
     assert.ok(rendered.text.includes("Friday at noon"));
+    assert.ok(rendered.text.includes("Come share your ideas."));
+    assert.ok(rendered.html.includes("Come share your ideas."));
     assert.ok(!rendered.html.includes("<script>"));
     assert.ok(rendered.html.includes("*|UNSUB|*"));
     assert.ok(!rendered.html.includes("Serpico"));

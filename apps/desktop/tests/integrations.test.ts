@@ -33,6 +33,12 @@ test("Mailchimp retries reuse the draft and uploaded images; no sending endpoint
     const assetId = store.putImage(
       Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
     );
+    const logoId = store.putImage(Buffer.from([255, 216, 255, 225]));
+    store.saveProfile({
+      ...profile,
+      logoAssetId: logoId,
+      logoAlt: "Community logo",
+    });
     const issue = store.saveIssue({
       ...newIssue(profile.id),
       subject: "Community news",
@@ -70,6 +76,16 @@ test("Mailchimp retries reuse the draft and uploaded images; no sending endpoint
       );
     assert.equal((await run()).campaignId, "campaign-one");
     await run();
+    store.saveIssue({
+      ...store.issue(issue.id),
+      blocks: [
+        {
+          ...newBlock("text"),
+          body: "The old issue image was removed; the brand logo stays.",
+        },
+      ],
+    });
+    await run();
     assert.equal(
       calls.filter(
         (call) => call.path.endsWith("/campaigns") && call.method === "POST",
@@ -78,7 +94,7 @@ test("Mailchimp retries reuse the draft and uploaded images; no sending endpoint
     );
     assert.equal(
       calls.filter((call) => call.path.endsWith("/file-manager/files")).length,
-      1,
+      2,
     );
     assert.ok(calls.every((call) => !/send|schedule/.test(call.path)));
     assert.ok(storedHtml.includes("https://example.com/hosted.png"));

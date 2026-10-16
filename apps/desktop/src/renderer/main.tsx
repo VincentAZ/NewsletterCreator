@@ -82,15 +82,19 @@ function App() {
     return api.onProgress(setProgress);
   }, [reload]);
   useEffect(() => {
-    for (const block of issue?.blocks || [])
-      if (block.assetId && !assets[block.assetId])
+    const ids = new Set(
+      [
+        profile?.logoAssetId,
+        ...(issue?.blocks || []).map((block) => block.assetId),
+      ].filter((id): id is string => Boolean(id)),
+    );
+    for (const id of ids)
+      if (!assets[id])
         void api
-          .invoke("readAsset", { id: block.assetId })
-          .then((data) =>
-            setAssets((current) => ({ ...current, [block.assetId]: data })),
-          )
+          .invoke("readAsset", { id })
+          .then((data) => setAssets((current) => ({ ...current, [id]: data })))
           .catch((error: Error) => setError(error.message));
-  }, [issue, assets]);
+  }, [issue, profile, assets]);
 
   async function flush() {
     clearTimeout(timer.current);
@@ -1164,7 +1168,7 @@ function Empty({
 
 function ProfileEditor({
   profile,
-  busy,
+  busy: externalBusy,
   save,
   createIssue,
   remove,
@@ -1176,6 +1180,26 @@ function ProfileEditor({
   remove: (id: string) => void;
 }) {
   const [value, setValue] = useState(profile || newProfile());
+  const [choosingLogo, setChoosingLogo] = useState(false);
+  const [logoError, setLogoError] = useState("");
+  const [logoPreview, setLogoPreview] = useState("");
+  const busy = externalBusy || choosingLogo;
+  useEffect(() => {
+    let active = true;
+    setLogoPreview("");
+    if (value.logoAssetId)
+      void api
+        .invoke("readAsset", { id: value.logoAssetId })
+        .then((data) => {
+          if (active) setLogoPreview(data);
+        })
+        .catch((error: Error) => {
+          if (active) setLogoError(error.message);
+        });
+    return () => {
+      active = false;
+    };
+  }, [value.logoAssetId]);
   useEffect(() => {
     if (profile) setValue(profile);
   }, [profile]);
@@ -1272,6 +1296,61 @@ function ProfileEditor({
             value={value.organization}
             onChange={(organization) => patch({ organization })}
           />
+          <details>
+            <summary>Brand logo (optional)</summary>
+            {logoPreview && (
+              <img
+                src={logoPreview}
+                alt={value.logoAlt || "Selected newsletter logo"}
+                style={{
+                  maxWidth: 240,
+                  maxHeight: 120,
+                  background: value.brandColor,
+                  padding: 12,
+                  marginTop: 12,
+                }}
+              />
+            )}
+            <div className="button-row">
+              <button
+                disabled={busy}
+                onClick={() =>
+                  void (async () => {
+                    setChoosingLogo(true);
+                    setLogoError("");
+                    try {
+                      const result = await api.invoke("pickImage", {});
+                      if (result) patch({ logoAssetId: result.assetId });
+                    } catch (error) {
+                      setLogoError(
+                        error instanceof Error
+                          ? error.message
+                          : "Could not read the logo.",
+                      );
+                    } finally {
+                      setChoosingLogo(false);
+                    }
+                  })()
+                }
+              >
+                Choose logo
+              </button>
+              {value.logoAssetId && (
+                <button
+                  disabled={busy}
+                  onClick={() => patch({ logoAssetId: "" })}
+                >
+                  Remove logo
+                </button>
+              )}
+            </div>
+            <Field
+              label="Logo description"
+              value={value.logoAlt}
+              onChange={(logoAlt) => patch({ logoAlt })}
+            />
+            {logoError && <p role="alert">{logoError}</p>}
+          </details>
           <Field
             label="Footer / contact information"
             value={value.footer}
@@ -1290,6 +1369,12 @@ function ProfileEditor({
               onChange={(ctaUrl) => patch({ ctaUrl })}
             />
           </div>
+          <Field
+            label="Optional call-to-action message"
+            value={value.ctaBody}
+            onChange={(ctaBody) => patch({ ctaBody })}
+            multiline
+          />
         </fieldset>
         <div className="button-row">
           <button
@@ -2022,9 +2107,9 @@ function SettingsEditor({
           <summary>Import your previous Supabase preferences</summary>
           <p>
             This is a read-only, one-time import. It adds your original
-            newsletter brand and sources locally. Original model choices and
-            prompt sets are preserved in your local backup without changing
-            provider defaults.
+            newsletter brand, hosted logo, and sources locally. Original model
+            choices and prompt sets are preserved in your local backup without
+            changing provider defaults.
           </p>
           <Field
             label="Supabase project URL"

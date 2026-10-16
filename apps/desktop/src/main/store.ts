@@ -84,6 +84,7 @@ export class Store {
   }
   saveProfile(input: Profile) {
     const value = profileSchema.parse(input);
+    if (value.logoAssetId) this.asset(value.logoAssetId);
     const saved = { ...value, revision: value.revision + 1 };
     this.save("profiles", value.id, value.revision, saved);
     return saved;
@@ -214,6 +215,12 @@ export class Store {
       assetIds.size !== backup.assets.length
     )
       throw new Error("Backup has duplicate IDs.");
+    if (
+      backup.profiles.some(
+        (profile) => profile.logoAssetId && !assetIds.has(profile.logoAssetId),
+      )
+    )
+      throw new Error("Backup has missing logo references.");
     for (const issue of backup.issues) {
       if (
         !profileIds.has(issue.profileId) ||
@@ -232,8 +239,13 @@ export class Store {
     // Preserve existing assets. Restore into new IDs to avoid file/DB rollback races.
     const remap = new Map<string, string>();
     const created: string[] = [];
+    const previousAssets = this.db
+      .prepare("SELECT id FROM assets")
+      .all()
+      .map((row) => id.parse(row.id));
     this.db.exec("BEGIN IMMEDIATE");
     try {
+      this.db.exec("DELETE FROM assets");
       for (const asset of assets) {
         const key = this.putImage(asset.bytes);
         remap.set(asset.id, key);
@@ -243,7 +255,11 @@ export class Store {
         "DELETE FROM exports; DELETE FROM issues; DELETE FROM profiles;",
       );
       for (const profile of backup.profiles)
-        this.saveProfile({ ...profile, revision: 0 });
+        this.saveProfile({
+          ...profile,
+          logoAssetId: remap.get(profile.logoAssetId) || "",
+          revision: 0,
+        });
       for (const issue of backup.issues)
         this.saveIssue({
           ...issue,
@@ -261,6 +277,13 @@ export class Store {
         if (existsSync(join(this.assetsDir, key)))
           rmSync(join(this.assetsDir, key));
       throw error;
+    }
+    for (const key of previousAssets) {
+      try {
+        rmSync(join(this.assetsDir, key), { force: true });
+      } catch {
+        /* The restored data is committed; an old unreferenced file can be cleaned later. */
+      }
     }
   }
   close() {

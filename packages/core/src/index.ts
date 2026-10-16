@@ -26,9 +26,12 @@ export const profileSchema = z.object({
   language: z.string().max(80).default("English"),
   freshnessDays: z.number().int().min(1).max(365),
   brandColor: z.string().regex(/^#[0-9a-f]{6}$/i),
+  logoAssetId: z.union([z.literal(""), id]).default(""),
+  logoAlt: z.string().max(500).default(""),
   organization: z.string().max(200),
   footer: z.string().max(2000),
   ctaLabel: z.string().max(100),
+  ctaBody: z.string().max(3000).default(""),
   ctaUrl: z.union([z.literal(""), webUrl]),
   sources: z.array(sourceSchema).max(100),
   legacyImport: z
@@ -314,9 +317,12 @@ export function newProfile(name = "My newsletter"): Profile {
     language: "English",
     freshnessDays: 7,
     brandColor: "#28665a",
+    logoAssetId: "",
+    logoAlt: "",
     organization: "",
     footer: "",
     ctaLabel: "",
+    ctaBody: "",
     ctaUrl: "",
     sources: [],
     revision: 0,
@@ -386,7 +392,11 @@ export function renderEmail(
     )
     .join("");
   const footer = `<p>${paragraphs(profile.footer)}</p>${mailchimp ? '<p>*|LIST:ADDRESS|*</p><a href="*|UNSUB|*">Unsubscribe</a> · <a href="*|UPDATE_PROFILE|*">Update preferences</a>' : ""}`;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(issue.subject || issue.title)}</title></head><body style="margin:0;background:#f2f1ed;color:#242b2a;font-family:Arial,Helvetica,sans-serif"><div style="display:none;max-height:0;overflow:hidden">${e(issue.preheader)}</div><table role="presentation" width="100%"><tr><td align="center" style="padding:32px 12px"><table role="presentation" width="640" style="max-width:100%;background:white;border-top:5px solid ${profile.brandColor}"><tr><td style="padding:36px 40px 12px"><p style="color:${profile.brandColor};font-size:12px;text-transform:uppercase;letter-spacing:2px">${e(profile.name)}</p><h1 style="font-size:32px;line-height:1.2">${e(issue.subject || issue.title)}</h1><p style="line-height:1.7">${paragraphs(issue.intro)}</p></td></tr>${blocks}${profile.ctaLabel && safeUrl(profile.ctaUrl) ? `<tr><td style="padding:24px 40px"><a style="background:${profile.brandColor};color:white;padding:14px 22px;border-radius:6px;display:inline-block" href="${e(profile.ctaUrl)}">${e(profile.ctaLabel)}</a></td></tr>` : ""}<tr><td style="padding:24px 40px;background:#f8f8f5;font-size:12px;color:#606965">${e(profile.organization)}${footer}</td></tr></table></td></tr></table></body></html>`;
+  const logo =
+    profile.logoAssetId && imageUrl(profile.logoAssetId)
+      ? `<tr><td align="center" style="background:${profile.brandColor};padding:24px"><img src="${e(imageUrl(profile.logoAssetId))}" alt="${e(profile.logoAlt || profile.name)}" width="240" style="max-width:100%;height:auto"></td></tr>`
+      : "";
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${e(issue.subject || issue.title)}</title></head><body style="margin:0;background:#f2f1ed;color:#242b2a;font-family:Arial,Helvetica,sans-serif"><div style="display:none;max-height:0;overflow:hidden">${e(issue.preheader)}</div><table role="presentation" width="100%"><tr><td align="center" style="padding:32px 12px"><table role="presentation" width="640" style="max-width:100%;background:white;border-top:5px solid ${profile.brandColor}">${logo}<tr><td style="padding:36px 40px 12px"><p style="color:${profile.brandColor};font-size:12px;text-transform:uppercase;letter-spacing:2px">${e(profile.name)}</p><h1 style="font-size:32px;line-height:1.2">${e(issue.subject || issue.title)}</h1><p style="line-height:1.7">${paragraphs(issue.intro)}</p></td></tr>${blocks}${profile.ctaLabel && safeUrl(profile.ctaUrl) ? `<tr><td style="padding:24px 40px">${profile.ctaBody ? `<p style="line-height:1.7">${paragraphs(profile.ctaBody)}</p>` : ""}<a style="background:${profile.brandColor};color:white;padding:14px 22px;border-radius:6px;display:inline-block" href="${e(profile.ctaUrl)}">${e(profile.ctaLabel)}</a></td></tr>` : ""}<tr><td style="padding:24px 40px;background:#f8f8f5;font-size:12px;color:#606965">${e(profile.organization)}${footer}</td></tr></table></td></tr></table></body></html>`;
   const text = [
     profile.name,
     issue.subject || issue.title,
@@ -395,6 +405,7 @@ export function renderEmail(
     ...issue.blocks.map((block) =>
       [block.title, block.body, block.url].filter(Boolean).join("\n"),
     ),
+    profile.ctaBody,
     profile.ctaLabel,
     profile.ctaUrl,
     profile.organization,

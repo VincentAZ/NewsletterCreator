@@ -113,13 +113,18 @@ export async function exportMailchimp(
       "This Mailchimp campaign is no longer an editable draft. Duplicate the local issue to create a new one.",
     );
   state.webId = campaign.web_id;
-  for (const block of issue.blocks) {
-    if (!block.assetId || images[block.assetId]) continue;
+  const assetIds = new Set(
+    [profile.logoAssetId, ...issue.blocks.map((block) => block.assetId)].filter(
+      Boolean,
+    ),
+  );
+  for (const assetId of assetIds) {
+    if (images[assetId]) continue;
     signal.throwIfAborted();
     report("Uploading newsletter image to Mailchimp…");
-    const asset = store.asset(block.assetId);
+    const asset = store.asset(assetId);
     const result = await request("/file-manager/files", "POST", {
-      name: `newsletter-${block.assetId}.${asset.mime.split("/")[1]}`,
+      name: `newsletter-${assetId}.${asset.mime.split("/")[1]}`,
       file_data: asset.bytes.toString("base64"),
     });
     if (
@@ -127,7 +132,7 @@ export async function exportMailchimp(
       !result.full_size_url.startsWith("https://")
     )
       throw new Error("Mailchimp did not return a hosted image URL.");
-    images[block.assetId] = result.full_size_url;
+    images[assetId] = result.full_size_url;
     checkpoint();
   }
   const rendered = renderEmail(profile, issue, images, true);
@@ -150,7 +155,7 @@ export async function exportMailchimp(
   if (
     typeof content.html !== "string" ||
     content.html.length < 200 ||
-    Object.values(images).some((url) => !String(content.html).includes(url))
+    [...assetIds].some((id) => !String(content.html).includes(images[id]))
   )
     throw new Error(
       "Mailchimp content verification failed. The draft ID is saved; retry to repair it.",
