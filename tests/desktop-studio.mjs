@@ -505,6 +505,22 @@ try {
   await page
     .getByRole("button", { name: "Preview & Export", exact: true })
     .click();
+  for (const name of ["Mobile", "Desktop"]) {
+    await page
+      .locator(".export-view")
+      .getByRole("button", { name, exact: true })
+      .click();
+    await expect
+      .poll(() =>
+        page.locator(".export-view iframe").evaluate((frame) => {
+          const email = frame.contentDocument?.querySelector("body > table");
+          if (!email) return false;
+          const expected = Math.max(500, email.getBoundingClientRect().height);
+          return Math.abs(frame.clientHeight - expected) < 2;
+        }),
+      )
+      .toBe(true);
+  }
   const destination = join(directory, "newsletter.html");
   await app.evaluate(({ dialog }, filePath) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath });

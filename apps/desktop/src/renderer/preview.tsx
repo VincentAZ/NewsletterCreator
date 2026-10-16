@@ -21,6 +21,7 @@ export function EmailPreview({
   const [height, setHeight] = useState(1000);
   const container = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
+  const contentObserver = useRef<ResizeObserver | null>(null);
   const rendered = renderEmail(profile, issue, assets);
   const width = mode === "mobile" ? 390 : 760;
   const scale = Math.min(1, available / width || 1);
@@ -30,7 +31,10 @@ export function EmailPreview({
       setAvailable(entries[0].contentRect.width),
     );
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      contentObserver.current?.disconnect();
+    };
   }, []);
   return (
     <div className={`email-preview ${compact ? "compact-preview" : ""}`}>
@@ -83,6 +87,10 @@ export function EmailPreview({
                     Math.max(500, email?.getBoundingClientRect().height || 0),
                   );
                 };
+                contentObserver.current?.disconnect();
+                const email = doc.body.querySelector("table");
+                contentObserver.current = new ResizeObserver(measure);
+                if (email) contentObserver.current.observe(email);
                 measure();
                 for (const image of Array.from(doc.images))
                   image.addEventListener("load", measure, { once: true });
