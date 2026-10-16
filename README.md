@@ -27,7 +27,7 @@ npm run desktop:build
 npm run desktop:package
 ```
 
-Linux UI smoke testing: `xvfb-run -a node tests/desktop-smoke.mjs` after building. The test uses a disposable local database. The prepared CI workflow targets Windows NSIS, Apple Silicon macOS DMG, and Linux AppImage packages. Activation is pending the personal GitHub token’s `workflow` permission. Artifacts are unsigned development previews unless signing credentials are explicitly supplied to electron-builder.
+Linux UI smoke testing: `xvfb-run -a node tests/desktop-smoke.mjs` after building. The test uses a disposable local database. The active CI workflow targets Windows NSIS, Apple Silicon macOS DMG, and Linux AppImage packages. Artifacts are unsigned development previews unless signing credentials are explicitly supplied to electron-builder.
 
 ## Data and deliberate network use
 
@@ -49,4 +49,4 @@ npm run lint
 npm run build
 ```
 
-Repository remote operations use the personal GitHub account. Desktop work remains separate from `main`. The existing AILearningCenter mirror is temporarily disabled: its previous `--mirror` command attempted to delete destination `main` on a feature push. The replacement helper is tested against temporary repositories; its workflow update awaits the same GitHub permission.
+Repository remote operations use the personal GitHub account. Desktop work remains separate from `main`. The existing AILearningCenter mirror is temporarily disabled: its previous `--mirror` command attempted to delete destination `main` on a feature push. The replacement helper is tested against temporary repositories and its repaired workflow is published on both branches. Re-enabling the private-repository mirror awaits explicit destination approval.

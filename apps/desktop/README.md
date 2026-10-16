@@ -26,7 +26,6 @@ Automated tests cover local revisions/restarts, backup validation/assets, unrela
 
 The following are **release blockers**, not claims of completed validation:
 
-- CI activation: the personal GitHub token lacks `workflow` scope. Desktop and repaired mirror workflow files are prepared locally; the old mirror is disabled pending its fix.
 - Real clean-machine managed installation and text/image inference on NVIDIA Windows/Linux and Apple Silicon macOS. This development host has an existing LM Studio installation and no usable NVIDIA driver connection; it cannot stand in for those machines.
 - Fully isolated LM Studio data, real-engine memory/cancellation/restart tests and third-party network capture. The app's own network boundary is independently tested.
 - Live Mailchimp draft/image/content verification with personal credentials and the chosen audience. Mocked API tests do not replace a live handoff.
