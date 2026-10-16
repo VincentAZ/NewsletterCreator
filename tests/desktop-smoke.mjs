@@ -90,7 +90,7 @@ try {
   await page
     .getByLabel("Your introduction", { exact: true })
     .fill("A few good things to share with our neighbors this week.");
-  await page.getByRole("button", { name: "＋ Text", exact: true }).click();
+  await page.getByRole("button", { name: "Text", exact: true }).click();
   await page
     .getByLabel("Heading", { exact: true })
     .fill("The community garden is growing");
@@ -106,11 +106,14 @@ try {
   await page.getByRole("button", { name: "Preview issue" }).click();
   await expect(
     page
-      .frameLocator('iframe[title="Newsletter preview"]')
+      .frameLocator('.export-view iframe[title="Newsletter preview"]')
       .getByText("The community garden is growing"),
   ).toBeVisible();
   await page.screenshot({ path: "/tmp/newsletter-desktop-preview.png" });
-  await page.getByRole("button", { name: "Plain text", exact: true }).click();
+  await page
+    .locator(".export-view")
+    .getByRole("button", { name: "Plain text", exact: true })
+    .click();
   await page.screenshot({ path: "/tmp/newsletter-desktop-text.png" });
   await expect(page.locator("pre")).toContainText("Join us on Saturday");
   const generated = await page.evaluate(async (origin) => {
