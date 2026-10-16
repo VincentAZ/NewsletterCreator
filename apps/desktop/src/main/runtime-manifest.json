@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "engines": {
+    "linux-x64": {
+      "uv": {
+        "url": "https://github.com/astral-sh/uv/releases/download/0.13.1/uv-x86_64-unknown-linux-gnu.tar.gz",
+        "digest": "sha256:eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220",
+        "bytes": 16738706,
+        "archive": "tar.gz",
+        "directory": "uv-x86_64-unknown-linux-gnu"
+      },
+      "text": {
+        "url": "https://llmster.lmstudio.ai/download/0.0.25-1-linux-x64.full.tar.gz",
+        "digest": "sha512:4d119af740379fc7509894d761a85183420a6dd3cb994596a1b6e4b37208a5d3e8cb94ffe583115b1473a6722bab5fffc09b90eb22c755f5dde1458774ab4951",
+        "bytes": 1005168404,
+        "archive": "tar.gz",
+        "directory": ""
+      }
+    },
+    "darwin-arm64": {
+      "uv": {
+        "url": "https://github.com/astral-sh/uv/releases/download/0.13.1/uv-aarch64-apple-darwin.tar.gz",
+        "digest": "sha256:cfe454573412ff7380d15fc7dae5997ab53ffce72fce0a78e91ddbc84001acd2",
+        "bytes": 14280170,
+        "archive": "tar.gz",
+        "directory": "uv-aarch64-apple-darwin"
+      },
+      "text": {
+        "url": "https://llmster.lmstudio.ai/download/0.0.25-1-darwin-arm64.full.tar.gz",
+        "digest": "sha512:edf1fb01f49b6ea101b3bd7027b4516eb73261d7b0df871c4286fac7011eb4f12633f7f03c9c6a66322659231c248989b7d235528b41bd2f30d87ce085c13b32",
+        "bytes": 0,
+        "archive": "tar.gz",
+        "directory": ""
+      }
+    },
+    "win32-x64": {
+      "uv": {
+        "url": "https://github.com/astral-sh/uv/releases/download/0.13.1/uv-x86_64-pc-windows-msvc.zip",
+        "digest": "sha256:3b2661a463a5baea7f5076ea2b25ab71d77f36a6c0d809e5350651792f80a672",
+        "bytes": 15308685,
+        "archive": "zip",
+        "directory": ""
+      },
+      "text": {
+        "url": "https://llmster.lmstudio.ai/download/0.0.25-1-win32-x64.full.zip",
+        "digest": "sha512:a17bfd052ea7a63182c4cd39b0619982e8027d19f6b00d0207207c8fa308540e502251662886a8ce8191a2bd0eb9132a48ee4991e784ebb5474d62ed3103fffe",
+        "bytes": 0,
+        "archive": "zip",
+        "directory": ""
+      }
+    }
+  },
+  "models": {
+    "text": {
+      "url": "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q4_K_M.gguf",
+      "digest": "sha256:7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+      "bytes": 2497280256,
+      "filename": "Qwen3-4B-Q4_K_M.gguf",
+      "repository": "Qwen/Qwen3-4B-GGUF",
+      "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+      "termsUrl": "https://huggingface.co/Qwen/Qwen3-4B-GGUF/blob/bc640142c66e1fdd12af0bd68f40445458f3869b/README.md"
+    },
+    "image": {
+      "url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/462165984030d82259a11f4367a4eed129e94a7b/sd_xl_base_1.0.safetensors",
+      "digest": "sha256:31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+      "bytes": 6938078334,
+      "filename": "sd_xl_base_1.0.safetensors",
+      "repository": "stabilityai/stable-diffusion-xl-base-1.0",
+      "revision": "462165984030d82259a11f4367a4eed129e94a7b",
+      "termsUrl": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/462165984030d82259a11f4367a4eed129e94a7b/README.md"
+    }
+  },
+  "comfy": {
+    "url": "https://api.github.com/repos/comfyanonymous/ComfyUI/zipball/v0.41.0",
+    "digest": "sha256:ec9186e0539ab9c2c497b632aebae7f676ce4b0464639b91a72a063dd17471ec",
+    "bytes": 13416540,
+    "archive": "zip",
+    "version": "v0.41.0"
+  }
+}

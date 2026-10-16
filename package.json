@@ -8,15 +8,22 @@
     "lint": "npm run lint --workspace apps/web",
     "db:ensure-schema": "node scripts/ensure-supabase-schema.mjs",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "desktop:dev": "npm run dev --workspace @newsletter/desktop",
+    "desktop:build": "npm run build --workspace @newsletter/desktop",
+    "desktop:package": "npm run package --workspace @newsletter/desktop",
+    "desktop:typecheck": "npm run typecheck --workspace @newsletter/desktop"
   },
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "apps/desktop",
+    "packages/core"
   ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",
     "eslint": "^10.12.0",
+    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript-eslint": "^8.71.2"
   }
