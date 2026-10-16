@@ -35,6 +35,8 @@ jobs:
       - run: npm run desktop:build
       - if: runner.os == 'Linux'
         run: xvfb-run -a node tests/desktop-smoke.mjs
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a -s "-screen 0 1920x1200x24" node tests/desktop-studio.mjs
       - run: npm exec --workspace @newsletter/desktop -- electron-builder --publish never ${{ matrix.target }}
       - if: runner.os == 'Linux'
         run: xvfb-run -a node tests/desktop-package-smoke.mjs

@@ -4,6 +4,8 @@ A local-first desktop workspace for newsletters about any subject. Curate source
 
 The Electron desktop app is the primary experience on `feat/local-first-redesign`. The previous Next.js app is retained in `apps/web` for regression comparison; its stabilized release stays on `main`.
 
+The editorial studio has three destinations: Library, Studio, and Settings. Start with just a newsletter name, add source stories without AI, and mix them with original text, events, images, and calls to action. Studio keeps writing in the center, with optional source and live email preview panels. Panels become drawers on smaller windows. Newsletter settings are available from the library and active newsletter menu.
+
 ## Desktop development
 
 Use Node 22.13+ and npm. No cloud credentials are required for manual writing, local storage, image uploads, previews, or HTML export.
@@ -28,6 +30,8 @@ npm run desktop:package
 ```
 
 Linux UI smoke testing: `xvfb-run -a node tests/desktop-smoke.mjs` after building. The test uses a disposable local database. The active CI workflow targets Windows NSIS, Apple Silicon macOS DMG, and Linux AppImage packages. Artifacts are unsigned development previews unless signing credentials are explicitly supplied to electron-builder.
+
+The focused studio regression suite is `xvfb-run -a -s "-screen 0 1920x1200x24" node tests/desktop-studio.mjs`. It exercises source insertion, targeted and whole-issue generation, scoped undo, image assets/export, save conflicts, keyboard controls, modal focus, four window sizes, and 125% zoom. Fixture inference stays local; it does not validate real engines or live Mailchimp.
 
 ## Data and deliberate network use
 
