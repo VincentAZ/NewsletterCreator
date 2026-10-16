@@ -90,6 +90,37 @@ test("backup roundtrip preserves source material and assets without copying expo
   }
 });
 
+test("issue updates keep database ownership and asset references consistent", () => {
+  const directory = mkdtempSync(join(tmpdir(), "newsletter-references-"));
+  const store = new Store(directory);
+  try {
+    const first = store.saveProfile(newProfile("First"));
+    const second = store.saveProfile(newProfile("Second"));
+    const issue = store.saveIssue(newIssue(first.id));
+    assert.throws(
+      () => store.saveIssue({ ...issue, profileId: crypto.randomUUID() }),
+      /Newsletter not found/,
+    );
+    assert.throws(
+      () =>
+        store.saveIssue({
+          ...issue,
+          blocks: [{ ...newBlock("image"), assetId: crypto.randomUUID() }],
+        }),
+      /Image not found/,
+    );
+    const moved = store.saveIssue({ ...issue, profileId: second.id });
+    store.deleteProfile(first.id);
+    assert.throws(() => store.deleteProfile(second.id), /issues first/);
+    assert.equal(store.issue(moved.id).profileId, second.id);
+    store.restore(store.backup());
+    assert.equal(store.issue(moved.id).profileId, second.id);
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("email rendering supports unrelated topics, original blocks, escaping, and optional images", () => {
   for (const topic of ["AI news", "Neighborhood gardening", "Bakery updates"]) {
     const profile = {

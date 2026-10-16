@@ -91,6 +91,11 @@ export class Store {
   }
   saveIssue(input: Issue) {
     const value = issueSchema.parse(input);
+    this.profile(value.profileId);
+    for (const assetId of new Set(
+      value.blocks.map((block) => block.assetId).filter(Boolean),
+    ))
+      this.asset(assetId);
     const saved = {
       ...value,
       revision: value.revision + 1,
@@ -116,11 +121,17 @@ export class Store {
           : this.db
               .prepare("INSERT OR IGNORE INTO issues VALUES(?,?,1,?)")
               .run(key, profileId!, json)
-        : this.db
-            .prepare(
-              `UPDATE ${table} SET revision=revision+1,json=? WHERE id=? AND revision=?`,
-            )
-            .run(json, key, revision);
+        : table === "issues"
+          ? this.db
+              .prepare(
+                "UPDATE issues SET revision=revision+1,json=?,profile_id=? WHERE id=? AND revision=?",
+              )
+              .run(json, profileId!, key, revision)
+          : this.db
+              .prepare(
+                `UPDATE ${table} SET revision=revision+1,json=? WHERE id=? AND revision=?`,
+              )
+              .run(json, key, revision);
     if (!result.changes)
       throw new Error(
         "This item changed in another window. Reload before saving.",

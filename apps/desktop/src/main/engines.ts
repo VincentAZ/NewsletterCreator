@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { createServer } from "node:net";
-import { once } from "node:events";
 import { setTimeout as delay } from "node:timers/promises";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
@@ -20,6 +19,7 @@ import manifest from "./runtime-manifest.json";
 import pythonLocks from "./python-locks/index.json";
 import { download, type Artifact } from "./download";
 import { jsonRequest, localUrl } from "./network";
+import { stopOwnedProcess } from "./owned-process";
 import type { Store } from "./store";
 
 type Report = (message: string, completed?: number, total?: number) => void;
@@ -29,6 +29,7 @@ const executable = (name: string) =>
 export class Engines {
   private processes = new Map<Engine, ChildProcess>();
   private installing = false;
+  private stopping = new Map<Engine, Promise<void>>();
   readonly root: string;
   private platform =
     `${process.platform}-${process.arch}` as keyof typeof manifest.engines;
@@ -177,11 +178,7 @@ export class Engines {
         );
       const owned = this.processes.get(engine);
       if (owned) {
-        const exited = once(owned, "exit", {
-          signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
-        });
-        this.stop(engine);
-        await exited;
+        await this.stop(engine);
       } else if (status.engines.find((item) => item.id === engine)?.connected) {
         report(
           "Existing engine detected; its installation and settings are unchanged.",
@@ -387,7 +384,7 @@ export class Engines {
       });
       return this.status();
     } catch (error) {
-      this.stop(engine);
+      await this.stop(engine);
       throw error;
     } finally {
       this.installing = false;
@@ -428,6 +425,7 @@ export class Engines {
     duringInstall = false,
   ) {
     signal.throwIfAborted();
+    await this.stopping.get(engine);
     if (!this.installed(engine) && !duringInstall)
       throw new Error(
         "Complete setup first, or start your existing engine outside this app.",
@@ -499,6 +497,7 @@ export class Engines {
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      detached: process.platform !== "win32",
     });
     this.processes.set(engine, child);
     let log = "";
@@ -509,9 +508,11 @@ export class Engines {
     child.stderr?.on("data", capture);
     child.on("error", (error) => {
       log = error.message;
-      this.processes.delete(engine);
+      if (this.processes.get(engine) === child) this.processes.delete(engine);
     });
-    child.on("exit", () => this.processes.delete(engine));
+    child.on("exit", () => {
+      if (this.processes.get(engine) === child) this.processes.delete(engine);
+    });
     try {
       if (engine === "text") {
         let ready = false;
@@ -556,28 +557,38 @@ export class Engines {
           await delay(1000, undefined, { signal });
         }
       }
-      this.stop(engine);
+      await this.stop(engine);
       throw new Error(
         "Engine startup timed out. Check available memory and GPU drivers, then retry.",
       );
     } catch (error) {
-      this.stop(engine);
+      await this.stop(engine);
       throw error;
     }
   }
-  stop(engine: Engine) {
+  async stop(engine: Engine) {
+    if (this.stopping.has(engine)) return this.stopping.get(engine);
     const child = this.processes.get(engine);
     if (child) {
-      child.kill();
-      this.processes.delete(engine);
+      const stopping = stopOwnedProcess(child);
+      this.stopping.set(engine, stopping);
+      try {
+        await stopping;
+      } finally {
+        if (
+          this.processes.get(engine) === child &&
+          (child.exitCode !== null || child.signalCode !== null)
+        )
+          this.processes.delete(engine);
+        this.stopping.delete(engine);
+      }
     }
   }
   owns(engine: Engine) {
     return this.processes.has(engine);
   }
-  stopAll() {
-    this.stop("text");
-    this.stop("image");
+  async stopAll() {
+    await Promise.all([this.stop("text"), this.stop("image")]);
   }
 }
 
@@ -589,15 +600,23 @@ export function run(
   report: Report = () => {},
   env: Record<string, string> = {},
 ): Promise<string> {
+  signal.throwIfAborted();
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command, args, {
       cwd,
-      signal,
       shell: false,
       windowsHide: true,
+      detached: process.platform !== "win32",
       env: { ...process.env, LMS_DAEMON_DISABLE_UPDATES: "1", ...env },
       stdio: ["ignore", "pipe", "pipe"],
     });
+    let cancellation: Promise<void> | undefined;
+    const abort = () => {
+      cancellation = stopOwnedProcess(child);
+      // Observe rejection immediately; close/error below settles the operation.
+      void cancellation.catch(reject);
+    };
+    signal.addEventListener("abort", abort, { once: true });
     let output = "";
     const consume = (chunk: Buffer) => {
       const text = chunk.toString();
@@ -611,16 +630,23 @@ export function run(
     };
     child.stdout.on("data", consume);
     child.stderr.on("data", consume);
-    child.on("error", reject);
-    child.on("close", (code) =>
-      code === 0
-        ? resolvePromise(output)
-        : reject(
+    child.on("error", (error) => {
+      signal.removeEventListener("abort", abort);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      signal.removeEventListener("abort", abort);
+      void (cancellation || Promise.resolve()).then(() => {
+        if (signal.aborted) reject(signal.reason);
+        else if (code === 0) resolvePromise(output);
+        else
+          reject(
             new Error(
               `${command.split(/[\\/]/).at(-1)} failed (${code}). ${output.slice(-1500)}`,
             ),
-          ),
-    );
+          );
+      }, reject);
+    });
   });
 }
 

@@ -183,11 +183,31 @@ export async function generateCopy(
       ),
     ),
   }));
+  // Constrain citations during decoding, then validate again below for providers
+  // that ignore JSON-schema constraints. Original writing has no source IDs.
+  const responseSchema = generatedSchema.extend({
+    blocks: z
+      .array(
+        generatedSchema.shape.blocks.element.extend({
+          sourceIds: sources.length
+            ? z
+                .array(
+                  z.enum(
+                    sources.map((source) => source.id) as [string, ...string[]],
+                  ),
+                )
+                .max(sources.length)
+            : z.array(z.string()).max(0),
+        }),
+      )
+      .min(1)
+      .max(target ? 1 : 20),
+  });
   const result = generatedSchema.parse(
     await provider.complete(
       settings.systemPrompt,
       instructions + JSON.stringify(references),
-      z.toJSONSchema(generatedSchema),
+      z.toJSONSchema(responseSchema),
       signal,
     ),
   );

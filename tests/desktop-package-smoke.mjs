@@ -6,12 +6,17 @@ import { join, resolve } from "node:path";
 const directory = mkdtempSync(join(tmpdir(), "newsletter-package-smoke-"));
 const testEnv = { ...process.env };
 delete testEnv.ELECTRON_RUN_AS_NODE;
+const packagedExecutable = {
+  linux: "linux-unpacked/newslettercreator",
+  win32: "win-unpacked/newslettercreator.exe",
+  darwin: "mac-arm64/newslettercreator.app/Contents/MacOS/newslettercreator",
+}[process.platform];
+if (!packagedExecutable) throw new Error("Unsupported package smoke platform");
 let app;
 try {
   app = await electron.launch({
     executablePath: resolve(
-      process.argv[2] ||
-        "apps/desktop/release/linux-unpacked/newslettercreator",
+      process.argv[2] || `apps/desktop/release/${packagedExecutable}`,
     ),
     args: ["--no-sandbox", `--user-data-dir=${directory}`],
     env: testEnv,

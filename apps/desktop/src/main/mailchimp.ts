@@ -1,6 +1,15 @@
 import { renderEmail, type Settings } from "@newsletter/core";
 import { HttpError, jsonRequest } from "./network";
 import type { Store } from "./store";
+import { parseHTML } from "linkedom";
+
+const normalizeCopy = (value: string) => value.replace(/\s+/g, " ").trim();
+function visibleCopy(html: string) {
+  const { document } = parseHTML(html);
+  for (const element of document.querySelectorAll("script,style"))
+    element.remove();
+  return normalizeCopy(document.body.innerText);
+}
 
 export async function exportMailchimp(
   store: Store,
@@ -49,6 +58,8 @@ export async function exportMailchimp(
       revision: issue.revision,
       updatedAt: new Date().toISOString(),
     });
+  state.complete = false;
+  checkpoint();
   if (!campaignId && state.creating) {
     report("Checking whether Mailchimp received the previous attempt…");
     // Recover uncertain POST outcomes using our stable marker, before risking a duplicate.
@@ -155,6 +166,9 @@ export async function exportMailchimp(
   if (
     typeof content.html !== "string" ||
     content.html.length < 200 ||
+    !visibleCopy(content.html).includes(visibleCopy(rendered.html)) ||
+    typeof content.plain_text !== "string" ||
+    !normalizeCopy(content.plain_text).includes(normalizeCopy(rendered.text)) ||
     [...assetIds].some((id) => !String(content.html).includes(images[id]))
   )
     throw new Error(

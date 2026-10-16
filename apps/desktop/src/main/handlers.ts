@@ -98,13 +98,13 @@ export function createHandlers(
           const settings = store.settings();
           const bytes = await imageProvider(settings, secrets)
             .generate(`${settings.imagePrompt}\n${prompt}`, signal, report)
-            .catch((error: unknown) => {
+            .catch(async (error: unknown) => {
               if (
                 signal.aborted &&
                 settings.imageProvider === "local" &&
                 engines.owns("image")
               )
-                engines.stop("image"); // Release our own process; never interrupt an existing shared engine.
+                await engines.stop("image"); // Release only our process tree.
               throw error;
             });
           return { assetId: store.putImage(bytes) };
@@ -123,7 +123,7 @@ export function createHandlers(
       ),
     startEngine: ({ engine }) => engines.start(engine),
     stopEngine: async ({ engine }) => {
-      engines.stop(engine);
+      await engines.stop(engine);
       return engines.status();
     },
     pickImage: async () => {

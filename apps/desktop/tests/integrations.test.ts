@@ -28,6 +28,8 @@ test("Mailchimp retries reuse the draft and uploaded images; no sending endpoint
   const oldFetch = globalThis.fetch;
   const calls: Array<{ path: string; method: string }> = [];
   let storedHtml = "";
+  let storedText = "";
+  let corruptContent = false;
   try {
     const profile = store.saveProfile(newProfile("Community"));
     const assetId = store.putImage(
@@ -55,8 +57,17 @@ test("Mailchimp retries reuse the draft and uploaded images; no sending endpoint
           full_size_url: "https://example.com/hosted.png",
         });
       if (path.endsWith("/content")) {
-        if (method === "PUT") storedHtml = JSON.parse(String(init?.body)).html;
-        return Response.json({ html: storedHtml });
+        if (method === "PUT") {
+          const content = JSON.parse(String(init?.body));
+          storedHtml = content.html;
+          storedText = content.plain_text;
+        }
+        return Response.json({
+          html: corruptContent
+            ? storedHtml.replaceAll("Community news", "Stale campaign")
+            : storedHtml,
+          plain_text: storedText,
+        });
       }
       return Response.json({ status: "save", web_id: 123 });
     };
@@ -99,6 +110,12 @@ test("Mailchimp retries reuse the draft and uploaded images; no sending endpoint
     assert.ok(calls.every((call) => !/send|schedule/.test(call.path)));
     assert.ok(storedHtml.includes("https://example.com/hosted.png"));
     assert.ok(!storedHtml.includes("data:image"));
+    corruptContent = true;
+    await assert.rejects(run(), /content verification failed/);
+    assert.equal(store.exportState(issue.id).complete, false);
+    corruptContent = false;
+    await run();
+    assert.equal(store.exportState(issue.id).complete, true);
   } finally {
     globalThis.fetch = oldFetch;
     store.close();

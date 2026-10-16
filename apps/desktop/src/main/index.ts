@@ -148,8 +148,26 @@ if (locked)
       app.quit();
     });
 app.on("window-all-closed", () => app.quit());
-app.on("before-quit", () => {
-  jobs?.cancelAll();
-  engines?.stopAll();
+let stopping = false;
+let stopped = false;
+app.on("before-quit", (event) => {
+  if (stopped) return;
+  event.preventDefault();
+  if (stopping) return;
+  stopping = true;
+  void (async () => {
+    await jobs?.cancelAllAndWait();
+    await engines?.stopAll();
+  })()
+    .catch((error) => {
+      dialog.showErrorBox(
+        "Local engine shutdown needs attention",
+        error instanceof Error ? error.message : String(error),
+      );
+    })
+    .finally(() => {
+      stopped = true;
+      app.quit();
+    });
 });
 app.on("will-quit", () => store?.close());
