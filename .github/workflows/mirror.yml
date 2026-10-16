@@ -7,6 +7,13 @@ on:
   delete:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-mirror
+  cancel-in-progress: false
+
 jobs:
   mirror:
     runs-on: ubuntu-latest
@@ -15,11 +22,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false          
+          persist-credentials: false
 
       - name: Push mirror to target repo
         env:
-          MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
-        run: |
-          git remote add mirror https://x-access-token:${MIRROR_TOKEN}@github.com/AILearningCenter/NewsletterCreator.git
-          git push --mirror mirror          
+          SOURCE_REPOSITORY_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          MIRROR_REPOSITORY_URL: https://x-access-token:${{ secrets.MIRROR_TOKEN }}@github.com/AILearningCenter/NewsletterCreator.git
+        run: bash scripts/mirror-repository.sh

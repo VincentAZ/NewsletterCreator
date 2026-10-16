@@ -1,0 +1,48 @@
+name: Desktop checks and preview packages
+on:
+  push:
+    branches: [feat/local-first-redesign]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: --linux --x64
+          - os: windows-latest
+            target: --win --x64
+          - os: macos-14
+            target: --mac --arm64
+    runs-on: ${{ matrix.os }}
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run desktop:typecheck
+      - run: npx eslint apps/desktop/src packages/core/src
+      - run: npm run test --workspace @newsletter/desktop
+      - run: npm run desktop:build
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a node tests/desktop-smoke.mjs
+      - run: npm exec --workspace @newsletter/desktop -- electron-builder --publish never ${{ matrix.target }}
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a node tests/desktop-package-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewsletterCreator-${{ runner.os }}-unsigned-preview
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.AppImage
+          if-no-files-found: error
