@@ -1,56 +1,59 @@
 # NewsletterCreator
 
-A local-first desktop workspace for newsletters about any subject. Curate source material, write original updates, arrange stories/events/images/calls to action, and export an email or create a Mailchimp draft.
+A local-first desktop app for writing email newsletters about any subject. Keep a few newsletters, write each edition as blocks (text, events, images, calls to action), pull in source stories if you want them, preview the email, and export self-contained HTML or hand a draft to Mailchimp.
 
-The Electron desktop app is the primary experience on `feat/local-first-redesign`. The previous Next.js app is retained in `apps/web` for regression comparison; its stabilized release stays on `main`.
+Free and open source under the [MIT License](LICENSE). No account, no sign-in, no analytics. Everything you write stays on your computer unless you connect a service and use it.
 
-The editorial studio has three destinations: Library, Studio, and Settings. Start with just a newsletter name, add source stories without AI, and mix them with original text, events, images, and calls to action. Studio keeps writing in the center, with optional source and live email preview panels. Panels become drawers on smaller windows. Newsletter settings are available from the library and active newsletter menu.
+## Download
 
-## Desktop development
+Packages for Windows (x64), macOS (Apple Silicon) and Linux (x64 AppImage) are attached to each [GitHub Release](../../releases). They are built by the public workflow in this repository and are **not code-signed**, so each operating system shows a one-time warning for software it cannot verify; the release notes explain the two clicks needed on each platform.
 
-Use Node 22.13+ and npm. No cloud credentials are required for manual writing, local storage, image uploads, previews, or HTML export.
+## What's inside
+
+- **Writing desk** — every newsletter in the rail, a resume card for the edition you touched last, editions as cards or a compact list.
+- **Studio** — a paper-style editor with the email subject, preview text and introduction on one card, blocks below, and optional source and live-preview panels that become drawers on small windows.
+- **Review & export** — desktop, mobile and plain-text previews that share one renderer with the exported HTML.
+- **Optional AI** — connect an LM Studio or ComfyUI server on your own machine, install a managed local runtime after reviewing the publishers' terms, or choose OpenRouter / fal.ai explicitly. Nothing falls back to the cloud silently. Until a writing model is chosen the AI buttons lead to setup instead of a dialog that cannot run.
+- **Mailchimp** — creates or updates a draft campaign with hosted images when you ask. No code sends or schedules.
+
+## Development
+
+Node 22.13+ and npm.
 
 ```sh
 npm ci
 npm run desktop:dev
 ```
 
-For local inference, connect an existing LM Studio HTTP server and ComfyUI in Settings, choose installed models, then generate. Local URLs must use loopback. OpenRouter and fal.ai are explicit optional choices; local failure never switches providers.
-
-The Local AI setup screen detects hardware/connections, discloses model downloads and publisher terms, and offers resumable, checksum-verified setup. See [desktop implementation and release gates](apps/desktop/README.md) before testing managed installation.
-
-## Build and verify
+### Verify
 
 ```sh
+npm test                                   # shared helpers
 npm run desktop:typecheck
 npx eslint apps/desktop/src packages/core/src
 npm run test --workspace @newsletter/desktop
 npm run desktop:build
+xvfb-run -a node tests/desktop-smoke.mjs                                      # Linux; drop xvfb-run on a desktop session
+xvfb-run -a -s "-screen 0 1920x1200x24" node tests/desktop-studio.mjs
+xvfb-run -a -s "-screen 0 1920x1200x24" node tests/desktop-contrast.mjs
 npm run desktop:package
+xvfb-run -a node tests/desktop-package-smoke.mjs
 ```
 
-Linux UI smoke testing: `xvfb-run -a node tests/desktop-smoke.mjs` after building. The test uses a disposable local database. The active CI workflow targets Windows NSIS, Apple Silicon macOS DMG, and Linux AppImage packages. Artifacts are unsigned development previews unless signing credentials are explicitly supplied to electron-builder.
+The smoke test checks create/edit/preview/export, restart recovery and that startup makes zero network requests. The studio suite covers source insertion, scoped undo, generation failure and retry, image persistence, save conflicts and the recovery bar, keyboard controls, modal focus, four window sizes and 125% zoom. The contrast suite re-measures text and control contrast and hit-area minimums (WCAG 2.2 AA) on nine seeded views and fails on regressions. CI runs all of this on Linux and builds packages on all three platforms; a `v*` tag publishes a release.
 
-The focused studio regression suite is `xvfb-run -a -s "-screen 0 1920x1200x24" node tests/desktop-studio.mjs`. It exercises source insertion, targeted and whole-issue generation, scoped undo, image assets/export, save conflicts, keyboard controls, modal focus, four window sizes, and 125% zoom. Fixture inference stays local; it does not validate real engines or live Mailchimp.
+See [apps/desktop/README.md](apps/desktop/README.md) for the runtime boundaries, the managed local-AI installer, and the hardware and live-service checks that cannot run in CI.
 
-## Data and deliberate network use
+## Data and network
 
-Settings, newsletter profiles, issues, provenance and export recovery state live in SQLite under Electron's OS application-data directory. Images live alongside it. API keys use Electron safeStorage backed by OS facilities; insecure Linux fallback is rejected in favor of session-only keys. Backups contain content/settings/assets, not credentials. Supabase import only reads the chosen preferences row and preserves its legacy prompt/model choices without activating cloud providers.
+Newsletters, editions, settings and export state live in SQLite under the OS application-data directory, with images alongside as files. API keys use Electron `safeStorage`; where the OS cannot encrypt them they are kept for the session only. Backups contain content, settings and images, never credentials.
 
-The renderer cannot access Node, filesystem, credentials or arbitrary networks. A validated IPC boundary delegates privileged actions to the main process. Gathering accesses public source URLs only on request. Setup downloads engines/models after consent. Mailchimp uploads assets and creates or updates a draft only when requested. No code sends or schedules campaigns.
+The renderer has no Node, filesystem, credential or network access; a validated IPC boundary delegates to the main process. Source collection fetches the public URLs you added, when you ask. Local AI setup downloads engines and models after consent. Mailchimp is contacted only on an explicit action. There are no remote fonts, analytics or update checks. Third-party inference engines are separate software with their own behavior.
 
-Our app has no analytics, remote fonts or automatic update checks. This is not a claim that the complete third-party inference stack is telemetry-free; that requires separate dependency inspection and real-engine network capture.
+## Legacy web app
 
-## Existing hosted web app
+`apps/web` is the earlier Next.js version, kept for regression comparison. It is not part of the desktop release.
 
-See [web setup and private deployment](apps/web/README.md). Production requires access credentials and the preferences revision migration. Without access credentials the dashboard and APIs return HTTP 503. A fail-closed deployment is protected, but is not yet ready for use until configured and tested with the personal deployment account.
+## License
 
-```sh
-npm test
-npm run test:e2e
-npm run typecheck
-npm run lint
-npm run build
-```
-
-Repository remote operations use the personal GitHub account. Desktop work remains separate from `main`. The existing AILearningCenter mirror is temporarily disabled: its previous `--mirror` command attempted to delete destination `main` on a feature push. The replacement helper is tested against temporary repositories and its repaired workflow is published on both branches. Re-enabling the private-repository mirror awaits explicit destination approval.
+MIT — see [LICENSE](LICENSE).

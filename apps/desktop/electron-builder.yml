@@ -2,7 +2,10 @@ appId: com.newslettercreator.desktop
 productName: NewsletterCreator
 executableName: newslettercreator
 icon: build/icon.png
-copyright: Copyright © 2026 Vincent Serpico
+copyright: Copyright © 2026 Vincent Serpico. MIT License.
+extraResources:
+  - from: ../../LICENSE
+    to: LICENSE
 asar: true
 npmRebuild: false
 toolsets:
@@ -15,16 +18,16 @@ files:
   - '!node_modules/**/*'
 win:
   target: nsis
-  artifactName: NewsletterCreator-${version}-windows-${arch}-preview.${ext}
+  artifactName: NewsletterCreator-${version}-windows-${arch}.${ext}
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
 mac:
   target: dmg
   category: public.app-category.productivity
-  artifactName: NewsletterCreator-${version}-mac-${arch}-preview.${ext}
+  artifactName: NewsletterCreator-${version}-mac-${arch}.${ext}
 linux:
   executableName: newslettercreator
   target: AppImage
   category: Office
-  artifactName: NewsletterCreator-${version}-linux-${arch}-preview.${ext}
+  artifactName: NewsletterCreator-${version}-linux-${arch}.${ext}

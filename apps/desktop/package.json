@@ -4,6 +4,7 @@
   "private": true,
   "description": "Local-first newsletter publishing workspace",
   "author": "Vincent Serpico",
+  "license": "MIT",
   "main": "dist/main/index.cjs",
   "scripts": {
     "dev": "node scripts/dev.mjs",

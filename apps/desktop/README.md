@@ -31,17 +31,14 @@ Automated tests cover local revisions/restarts, backup validation/assets, unrela
 
 On October 16, 2026, separate real-engine tests passed on Linux with an NVIDIA RTX PRO 6000 Blackwell (96 GB VRAM): targeted text generation through an existing user-owned LM Studio server; official pinned ComfyUI/Python/PyTorch/SDXL installation into the application's validation directory; real image generation; owned-engine stop/restart; cancellation followed by restart; and image/issue persistence after application restart. An OS-level trace of the application and managed ComfyUI children during generation/recovery observed only loopback network destinations. The existing LM Studio process was outside that trace. This does **not** establish complete-stack telemetry freedom, managed Qwen installation, a clean-machine installation, or behavior on lower-memory hardware.
 
-The [cross-platform run for `7caddf3`](https://github.com/VincentAZ/NewsletterCreator/actions/runs/38953965903) passed Windows, macOS 15/Apple Silicon and Linux packaging and native application launch checks. The personal Supabase Newsletter Generator project also received the existing `revision bigint not null default 1` migration on October 16. A transaction compared all pre-existing preference fields before and after the addition and would have rolled back on any difference; the check passed. No preference fields or rows were removed.
+The [cross-platform run for `7caddf3`](https://github.com/VincentAZ/NewsletterCreator/actions/runs/38953965903) passed Windows, macOS 15/Apple Silicon and Linux packaging and native application launch checks.
 
-The following are **release blockers**, not claims of completed validation:
+The desktop app is released as free, open-source, **unsigned** software. The remaining limits of a release are stated here so nobody mistakes an automated pass for a validated one:
 
-- Real clean-machine managed installation and text/image inference on NVIDIA Windows/Linux and Apple Silicon macOS. The Linux development host has existing engines; its successful managed image test cannot stand in for clean-machine or other-platform tests.
-- Fully isolated LM Studio data, managed Qwen inference, real-engine memory-pressure behavior and network capture including the text runtime. Managed ComfyUI cancellation/restart and the app's own network boundary have passed independently.
-- Live Mailchimp draft/image/content verification with personal credentials and the chosen audience. Mocked API tests do not replace a live handoff.
-- Authenticated dashboard/API verification for the old web release. Anonymous hosted access currently fails closed; the Supabase revision migration is now applied. The browser opens Vercel under the `<team>` team (displayed as “<account>”); automatic approval review blocked further inspection under the repository's personal-account rule. Account-scope confirmation is required before proceeding there.
-- Signing/notarization credentials and platform installation smoke tests. Until supplied, installers are labeled development previews.
-
-Keep this branch separate from `main` until the release gates are met.
+- **Managed local-AI installation** has passed on the Linux development host only. Clean-machine installation and inference on Windows and macOS, lower-memory hardware, and memory-pressure behavior are unverified; the installer stays available because every step is disclosed, checksum-verified and cancellable, but treat it as beta on those platforms.
+- **Live Mailchimp handoff** is covered by mocked API tests and an opt-in live script that requires personal credentials. It has not been run against a real account.
+- **Code signing and notarization** are intentionally absent. Each platform shows a one-time warning for unverified software; the release notes explain it. The `Signed desktop release candidates` workflow remains for anyone who later supplies certificates.
+- **The legacy web app** in `apps/web` is not part of the release.
 
 ## Reproducing hardware and live-service checks
 
