@@ -6,6 +6,7 @@ sent anywhere unless you connect a service in **AI & integrations** and use it.
 
 - **Windows (x64):** `NewsletterCreator-<version>-windows-x64.exe`
 - **macOS (Apple Silicon):** `NewsletterCreator-<version>-mac-arm64.dmg`
+- **macOS (Intel):** `NewsletterCreator-<version>-mac-x64.dmg`
 - **Linux (x64):** `NewsletterCreator-<version>-linux-x86_64.AppImage`
 
 ## These builds are not code-signed
