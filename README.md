@@ -78,7 +78,6 @@ npm run desktop:dev
 ### Verify
 
 ```sh
-npm test                                   # shared helpers
 npm run desktop:typecheck
 npx eslint apps/desktop/src packages/core/src
 npm run test --workspace @newsletter/desktop

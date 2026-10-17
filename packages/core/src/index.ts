@@ -34,13 +34,6 @@ export const profileSchema = z.object({
   ctaBody: z.string().max(3000).default(""),
   ctaUrl: z.union([z.literal(""), webUrl]),
   sources: z.array(sourceSchema).max(100),
-  legacyImport: z
-    .object({
-      origin: z.string().max(1000),
-      importedAt: z.string(),
-      preferences: z.record(z.string(), z.unknown()),
-    })
-    .optional(),
   revision: z.number().int().min(0),
 });
 export const articleSchema = z.object({
@@ -257,14 +250,6 @@ export const commandSchemas = {
   readAsset: z.object({ id }),
   backup: z.object({}),
   restore: z.object({}),
-  importSupabase: z.object({
-    url: webUrl,
-    key: z.string().min(1),
-    preferenceId: z
-      .string()
-      .regex(/^[a-zA-Z0-9_-]{8,80}$/)
-      .default("default-preferences"),
-  }),
   exportHtml: z.object({ issueId: id }),
   mailchimp: z.object({ jobId: id, issueId: id }),
   openExternal: z.object({ url: webUrl }),
@@ -297,7 +282,6 @@ export type Output = {
   readAsset: string;
   backup: string | null;
   restore: boolean;
-  importSupabase: Profile;
   exportHtml: string | null;
   mailchimp: { campaignId: string; url: string };
   openExternal: void;

@@ -1,7 +1,7 @@
-name: Desktop checks and preview packages
+name: Checks and packages
 on:
   push:
-    branches: [main, feat/local-first-redesign, feat/astra-visual-port]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -24,7 +24,6 @@ jobs:
             unpacked: apps/desktop/release/mac/newslettercreator.app/Contents/MacOS/newslettercreator
     runs-on: ${{ matrix.os }}
     env:
-      NEXT_TELEMETRY_DISABLED: "1"
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +32,6 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npm test
       - run: npm run desktop:typecheck
       - run: npx eslint apps/desktop/src packages/core/src
       - run: npm run test --workspace @newsletter/desktop

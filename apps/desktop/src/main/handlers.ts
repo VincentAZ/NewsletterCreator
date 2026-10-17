@@ -7,9 +7,7 @@ import {
   renameSync,
 } from "node:fs";
 import { join } from "node:path";
-import { z } from "zod";
 import {
-  newProfile,
   renderEmail,
   type Command,
   type Input,
@@ -27,7 +25,7 @@ import {
 } from "./providers";
 import { gather } from "./gather";
 import { exportMailchimp } from "./mailchimp";
-import { fetchPublic, limitedBytes, jsonRequest, localUrl } from "./network";
+import { localUrl } from "./network";
 
 type Handlers = {
   [K in Command]: (input: Input<K>) => Output[K] | Promise<Output[K]>;
@@ -177,81 +175,6 @@ export function createHandlers(
       );
       store.restore(value);
       return true;
-    },
-    importSupabase: async ({ url, key, preferenceId }) => {
-      const base = new URL(url);
-      if (base.protocol !== "https:" || !base.hostname.endsWith(".supabase.co"))
-        throw new Error("Use your Supabase project's HTTPS URL.");
-      const origin = `${base.origin}/${preferenceId}`;
-      const existing = store
-        .profiles()
-        .find((profile) => profile.legacyImport?.origin === origin);
-      if (existing) return existing;
-      const result = await jsonRequest(
-        `${base.origin}/rest/v1/newsletter_preferences?preference_id=eq.${encodeURIComponent(preferenceId)}&select=*`,
-        { headers: { apikey: key, Authorization: `Bearer ${key}` } },
-      );
-      const rows = z
-        .array(
-          z.object({
-            sources: z
-              .array(
-                z.object({
-                  name: z.string(),
-                  url: z.string(),
-                  type: z.string(),
-                  enabled: z.boolean(),
-                }),
-              )
-              .default([]),
-            copy_model: z.string().nullable().optional(),
-            scrape_model: z.string().nullable().optional(),
-            image_model: z.string().nullable().optional(),
-            prompt_sets: z.array(z.record(z.string(), z.unknown())).optional(),
-            last_prompt_set_id: z.string().nullable().optional(),
-            current_prompt_set: z
-              .record(z.string(), z.unknown())
-              .nullable()
-              .optional(),
-          }),
-        )
-        .parse(result);
-      if (!rows.length)
-        throw new Error("No saved preferences found for that ID.");
-      const profile = newProfile("Serpico AI Learning Center");
-      profile.topic = "AI news";
-      profile.audience = "Business owners and AI practitioners";
-      profile.organization = "Serpico AI Learning Center";
-      profile.brandColor = "#0d1b2e";
-      profile.footer =
-        "© 2026 Serpico AI Learning Center · Phoenix, AZ\nhttps://www.example.com";
-      profile.ctaLabel = "Reserve Your 1:1 Expert Training";
-      profile.ctaBody =
-        "Solve your business problem in less than a day.\n\nWe begin with a discovery call. We then pair you with the right specialist to help you build a tailored solution for your business.\n\nNot a course. Not merely learning about AI. It's a real, working tool.";
-      profile.logoAlt = "Serpico AI Learning Center at CEI";
-      // Download the previous hosted logo only during this explicit migration.
-      profile.logoAssetId = store.putImage(
-        await limitedBytes(
-          await fetchPublic(
-            "https://mcusercontent.com/<account-id>/images/0ce7f308-4079-72f1-3d96-c66dd291cc4d.png",
-          ),
-        ),
-      );
-      profile.ctaUrl = "https://www.example.com/training";
-      profile.freshnessDays = 3;
-      profile.sources = rows[0].sources.map((source) => ({
-        ...source,
-        id: crypto.randomUUID(),
-        type: source.type === "rss" ? "rss" : "website",
-      }));
-      // Preserve all legacy model/prompt choices without silently activating a
-      // cloud provider or changing defaults for unrelated newsletters.
-      profile.legacyImport = {
-        origin,
-        importedAt: new Date().toISOString(),
-        preferences: rows[0],
-      };
-      return store.saveProfile(profile);
     },
     exportHtml: async ({ issueId }) => {
       const issue = store.issue(issueId);

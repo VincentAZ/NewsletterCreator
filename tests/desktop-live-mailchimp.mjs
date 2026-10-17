@@ -26,7 +26,8 @@ if (
   );
 const key = process.env.MAILCHIMP_API_KEY;
 const region = key.split("-").at(-1);
-if (!/^us\d+$/.test(region)) throw new Error("Invalid Mailchimp API key region");
+if (!/^us\d+$/.test(region))
+  throw new Error("Invalid Mailchimp API key region");
 const origin = `https://${region}.api.mailchimp.com`;
 const directory = resolve(
   process.env.NEWSLETTER_VALIDATION_DATA ||

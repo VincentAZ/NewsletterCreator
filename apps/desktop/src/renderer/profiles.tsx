@@ -238,7 +238,6 @@ export function ProfileEditor({
                   id: crypto.randomUUID(),
                   name: `${value.name} (copy)`,
                   revision: 0,
-                  legacyImport: undefined,
                   sources: value.sources.map((source) => ({
                     ...source,
                     id: crypto.randomUUID(),
@@ -268,7 +267,7 @@ export function ProfileEditor({
           <span className="eyebrow">A SIMPLE START</span>
           <h3>Specific beats generic.</h3>
           <p>
-            “Helpful advice for first-time gardeners in Phoenix” gives your
+            “Helpful advice for first-time gardeners in your town” gives your
             newsletter more direction than “gardening.”
           </p>
           <p>

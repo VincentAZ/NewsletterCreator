@@ -12,7 +12,6 @@ export function SettingsEditor({
   run,
   saved,
   restore,
-  importComplete,
 }: {
   library: Library;
   section: "writing" | "mailchimp" | "data";
@@ -20,17 +19,11 @@ export function SettingsEditor({
   run: (work: () => Promise<unknown>) => Promise<unknown>;
   saved: () => Promise<void>;
   restore: () => Promise<void>;
-  importComplete: () => Promise<void>;
 }) {
   const [value, setValue] = useState<Settings>(library.settings);
   const [models, setModels] = useState<string[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [keys, setKeys] = useState({ openrouter: "", fal: "", mailchimp: "" });
-  const [supabase, setSupabase] = useState({
-    url: "",
-    key: "",
-    preferenceId: "default-preferences",
-  });
   const patch = (part: Partial<Settings>) => setValue({ ...value, ...part });
   async function connect(kind: "text" | "image") {
     await api.invoke("settings", value);
@@ -301,46 +294,6 @@ export function SettingsEditor({
             Restore backup
           </button>
         </div>
-        <hr />
-        <details>
-          <summary>Import your previous Supabase preferences</summary>
-          <p>
-            This is a read-only, one-time import. It adds your original
-            newsletter brand, hosted logo, and sources locally. Original model
-            choices and prompt sets are preserved in your local backup without
-            changing provider defaults.
-          </p>
-          <Field
-            label="Supabase project URL"
-            value={supabase.url}
-            onChange={(url) => setSupabase({ ...supabase, url })}
-          />
-          <Field
-            label="Supabase key (used only for this import)"
-            type="password"
-            value={supabase.key}
-            onChange={(key) => setSupabase({ ...supabase, key })}
-          />
-          <Field
-            label="Preference ID"
-            value={supabase.preferenceId}
-            onChange={(preferenceId) =>
-              setSupabase({ ...supabase, preferenceId })
-            }
-          />
-          <button
-            disabled={busy || !supabase.key || !supabase.url}
-            onClick={() =>
-              void run(async () => {
-                await api.invoke("importSupabase", supabase);
-                setSupabase({ ...supabase, key: "" });
-                await importComplete();
-              })
-            }
-          >
-            Import preferences
-          </button>
-        </details>
         <hr />
         <h3>Intentional connections</h3>
         <p>

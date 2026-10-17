@@ -1,22 +1,21 @@
 {
-  "name": "godmode-newsletter-workspace",
+  "name": "newslettercreator",
   "private": true,
   "license": "MIT",
   "scripts": {
-    "dev": "npm run dev --workspace apps/web",
-    "build": "npm run build --workspace apps/web",
-    "typecheck": "npm run typecheck --workspace apps/web",
-    "lint": "npm run lint --workspace apps/web",
-    "db:ensure-schema": "node scripts/ensure-supabase-schema.mjs",
-    "test": "node --import tsx --test tests/*.test.ts",
-    "test:e2e": "playwright test",
+    "dev": "npm run dev --workspace @newsletter/desktop",
+    "build": "npm run build --workspace @newsletter/desktop",
+    "typecheck": "npm run typecheck --workspace @newsletter/desktop",
+    "lint": "eslint apps/desktop/src packages/core/src",
+    "format": "prettier --check .",
+    "test": "npm run test --workspace @newsletter/desktop",
+    "package": "npm run package --workspace @newsletter/desktop",
     "desktop:dev": "npm run dev --workspace @newsletter/desktop",
     "desktop:build": "npm run build --workspace @newsletter/desktop",
     "desktop:package": "npm run package --workspace @newsletter/desktop",
     "desktop:typecheck": "npm run typecheck --workspace @newsletter/desktop"
   },
   "workspaces": [
-    "apps/web",
     "apps/desktop",
     "packages/core"
   ],

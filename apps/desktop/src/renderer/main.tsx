@@ -185,12 +185,6 @@ function App() {
                   );
                 }
               }}
-              importComplete={async () => {
-                await w.reload();
-                w.setStatus(
-                  "Preferences imported. The original Supabase data is unchanged.",
-                );
-              }}
             />
           )}
           {w.page === "setup" && (

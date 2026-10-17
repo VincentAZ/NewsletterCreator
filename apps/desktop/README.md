@@ -13,7 +13,6 @@
 - Explicit local LM Studio/ComfyUI providers and optional OpenRouter/fal providers. Structured copy is validated; source IDs cannot be invented. Model failures leave the saved issue unchanged.
 - Native setup with platform-specific manifests, verified/resumable downloads, isolated Python virtual environment, built-in ComfyUI SDXL graph, hardware/disk/port checks, cancellation, repair and owned-process shutdown.
 - Mailchimp hosted image upload, persistent campaign/asset checkpoints, uncertain-create recovery, draft status checks and stored-HTML verification. No send/schedule routes.
-- Read-only Supabase import: imported profiles retain Serpico branding and sources; all legacy model/prompt fields are archived in the local profile and backups. Reimporting the same row returns the existing imported profile. Cloud providers are never activated by import.
 
 ## Runtime boundaries
 
@@ -37,7 +36,7 @@ The desktop app is released as free, open-source, **unsigned** software. The rem
 
 - **Managed local-AI installation** has passed on the Linux development host only. Clean-machine installation and inference on Windows and macOS, lower-memory hardware, and memory-pressure behavior are unverified; the installer stays available because every step is disclosed, checksum-verified and cancellable, but treat it as beta on those platforms.
 - **Live Mailchimp handoff** is covered by mocked API tests and an opt-in live script that requires personal credentials. It has not been run against a real account.
-- **Code signing and notarization** are intentionally absent. Each platform shows a one-time warning for unverified software; the release notes explain it. The `Signed desktop release candidates` workflow remains for anyone who later supplies certificates.
+- **Code signing and notarization** are intentionally absent. Each platform shows a one-time warning for unverified software; the release notes explain it. Anyone who later supplies certificates can add `CSC_LINK`/`CSC_KEY_PASSWORD` to the release workflow; electron-builder signs automatically when they are present.
 - **The legacy web app** in `apps/web` is not part of the release.
 
 ## Reproducing hardware and live-service checks
@@ -48,11 +47,3 @@ Build the desktop first. These opt-in scripts use isolated validation data under
 - `node --import tsx tests/desktop-real-engines.mjs --managed-image`: tests the previously installed validation stack without downloading it again. Set `NEWSLETTER_TEXT_MODEL` to an available model to also check the existing LM Studio server at port 1234; `NEWSLETTER_LM_URL` can select another loopback server. Reports are saved as `evidence.json`.
 - For Linux OS-level runtime capture, set `NEWSLETTER_ELECTRON_WRAPPER` to the absolute path of `tests/trace-electron.sh` and `NEWSLETTER_NETWORK_TRACE` to an absolute output prefix before the real-engine test. This requires `strace`. Summarize with `node tests/summarize-network-trace.mjs <prefix>`; external or unrecognized Internet destinations fail the check. This capture includes the application and children it starts, **not** independently running engines. Capture installation separately from inference because installation intentionally downloads artifacts.
 - `node --import tsx tests/desktop-live-mailchimp.mjs`: requires explicit `NEWSLETTER_LIVE_MAILCHIMP=1` plus securely configured `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID`, `MAILCHIMP_FROM_NAME`, and `MAILCHIMP_REPLY_TO`. It creates a clearly labeled synthetic draft, uploads a test image, simulates a lost verification response, restarts storage, retries the same campaign, verifies hosted images/content and draft status, and retains the draft and evidence for inspection. It never sends or schedules. Subsequent runs reuse the same validation issue/campaign. This check remains unrun without personal test credentials.
-
-## Signed release candidates
-
-The October 16 Linux validation also launched the actual AppImage with Chromium's normal sandbox enabled, using AppImage's extract-and-run mode to avoid a FUSE dependency. To repeat: `NEWSLETTER_PACKAGE_NATIVE_SANDBOX=1 APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a node tests/desktop-package-smoke.mjs apps/desktop/release/NewsletterCreator-0.1.0-linux-x86_64-preview.AppImage`. Native Windows/macOS package checks keep their normal sandbox settings; Linux hosted CI uses `--no-sandbox` because runner sandbox support differs. The macOS build runner uses macOS 15 because the [macOS 14 hosted image is being retired](https://github.com/actions/runner-images/issues/13518); this does not change the managed runtime's macOS 14 minimum requirement.
-
-Ordinary CI continues to produce unsigned development previews. The separate, manually triggered **Signed desktop release candidates** workflow uses `electron-builder.signed.cjs`, requires signing, checks the Windows installer/application signatures, and validates macOS signing, Gatekeeper acceptance and notarization. It never publishes a release or merges branches. Its configuration has been validated locally; actual signing remains unverified until credentials are supplied.
-
-Configure personal-repository secrets `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD`, `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`. Certificate links may contain base64 certificate data as supported by electron-builder. Keep secrets out of source files and chat. The workflow fails before installation/build if required credentials are absent. A signed candidate still must pass the real installation, inference and live-service gates above before it is a production release.
