@@ -12,3 +12,4 @@ test-results/
 playwright-report/
 dist/
 release/
+temp-git-ignore/

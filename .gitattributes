@@ -1,0 +1,4 @@
+# These files are verified byte-for-byte before installing managed engines.
+apps/desktop/src/main/python-locks/*.txt text eol=lf
+# Keep executable scripts usable in Windows Git Bash checkouts too.
+*.sh text eol=lf

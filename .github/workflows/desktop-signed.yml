@@ -1,0 +1,76 @@
+name: Signed desktop release candidates
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win --x64
+            certificate: WIN_CSC_LINK
+            password: WIN_CSC_KEY_PASSWORD
+          - os: macos-15
+            target: --mac --arm64
+            certificate: MAC_CSC_LINK
+            password: MAC_CSC_KEY_PASSWORD
+    runs-on: ${{ matrix.os }}
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      CSC_LINK: ${{ secrets[matrix.certificate] }}
+      CSC_KEY_PASSWORD: ${{ secrets[matrix.password] }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Require configured signing credentials
+        shell: bash
+        run: |
+          node --input-type=module -e '
+          const required = ["CSC_LINK", "CSC_KEY_PASSWORD"];
+          if (process.platform === "darwin") required.push("APPLE_ID", "APPLE_APP_SPECIFIC_PASSWORD", "APPLE_TEAM_ID");
+          const missing = required.filter(key => !process.env[key]);
+          if (missing.length) throw new Error("Configure signing secrets before building: " + missing.join(", "));
+          '
+      - run: npm ci
+      - run: npm test
+      - run: npm run desktop:typecheck
+      - run: npx eslint apps/desktop/src packages/core/src
+      - run: npm run test --workspace @newsletter/desktop
+      - run: npm run desktop:build
+      - run: npm exec --workspace @newsletter/desktop -- electron-builder --config electron-builder.signed.cjs --publish never ${{ matrix.target }}
+      - name: Verify Windows installer and application signatures
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem apps/desktop/release/signed/*.exe) + @(Get-Item apps/desktop/release/signed/win-unpacked/newslettercreator.exe)
+          if ($files.Count -lt 2) { throw "Missing signed packages" }
+          foreach ($file in $files) {
+            $signature = Get-AuthenticodeSignature $file.FullName
+            if ($signature.Status -ne 'Valid') { throw "Invalid signature: $($file.Name): $($signature.Status)" }
+          }
+          node tests/desktop-package-smoke.mjs apps/desktop/release/signed/win-unpacked/newslettercreator.exe
+          if ($LASTEXITCODE -ne 0) { throw "Signed application smoke test failed" }
+      - name: Verify macOS signing and notarization
+        if: runner.os == 'macOS'
+        run: |
+          app=apps/desktop/release/signed/mac-arm64/newslettercreator.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          spctl --assess --type execute --verbose=2 "$app"
+          xcrun stapler validate "$app"
+          node tests/desktop-package-smoke.mjs "$app/Contents/MacOS/newslettercreator"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewsletterCreator-${{ runner.os }}-signed-candidate
+          path: |
+            apps/desktop/release/signed/*.exe
+            apps/desktop/release/signed/*.dmg
+          if-no-files-found: error

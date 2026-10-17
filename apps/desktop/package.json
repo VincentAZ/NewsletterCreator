@@ -1,0 +1,37 @@
+{
+  "name": "@newsletter/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first newsletter publishing workspace",
+  "author": "Vincent Serpico",
+  "license": "MIT",
+  "main": "dist/main/index.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "package": "npm run build && electron-builder --publish never",
+    "test": "node --import tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "@newsletter/core": "*",
+    "fast-xml-parser": "^5.11.2",
+    "linkedom": "^0.18.13",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tar": "^7.5.22",
+    "undici": "^8.12.2",
+    "yauzl": "^3.4.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/yauzl": "^3.4.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "44.8.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "vite": "^8.3.4"
+  },
+  "type": "module"
+}
