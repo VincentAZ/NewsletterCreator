@@ -34,7 +34,11 @@ try {
   expect(info.packaged).toBe(true);
   expect(realpathSync(info.directory)).toBe(realpathSync(directory));
   const page = await app.firstWindow();
-  await expect(page.getByText("A good newsletter starts here.")).toBeVisible();
+  // First launch of a packaged build initialises SQLite and the asset folder;
+  // the Intel macOS build also runs under Rosetta on Apple Silicon runners.
+  await expect(
+    page.getByText("A good newsletter starts here."),
+  ).toBeVisible({ timeout: 60000 });
   const library = await page.evaluate(() =>
     window.newsletter.invoke("library", {}),
   );
