@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { newBlock, type Block } from "@newsletter/core";
-import { api, Dialog, Field, Icon } from "./ui";
+import { api, Dialog, Field, Icon, writingReady } from "./ui";
 import type { Workspace } from "./workspace";
 
 export function IssueEditor({
@@ -22,6 +22,10 @@ export function IssueEditor({
   const [imageDialog, setImageDialog] = useState(false);
   const selected = issue.articles.filter((article) => article.selected).length;
   const originals = issue.blocks.filter((block) => block.kind !== "story");
+  // Before a text provider is configured, the AI actions lead to setup instead
+  // of opening a dialog that cannot do anything.
+  const ready = writingReady(w.library!);
+  const setup = () => void w.navigate("settings");
   function draft() {
     if (
       issue.subject ||
@@ -58,14 +62,21 @@ export function IssueEditor({
           <span className="eyebrow">Edition</span>
           <h1>{issue.title}</h1>
         </div>
-        <button
-          className="primary"
-          disabled={w.busy || (!selected && !issue.blocks.length)}
-          onClick={draft}
-        >
-          <Icon name="edit" />
-          Draft with AI
-        </button>
+        {ready ? (
+          <button
+            className="primary"
+            disabled={w.busy || (!selected && !issue.blocks.length)}
+            onClick={draft}
+          >
+            <Icon name="edit" />
+            Draft with AI
+          </button>
+        ) : (
+          <button disabled={w.busy} onClick={setup}>
+            <Icon name="edit" />
+            Set up AI writing
+          </button>
+        )}
       </div>
       <p className="editor-context">
         {selected
@@ -150,13 +161,15 @@ export function IssueEditor({
               <div className="block-tools">
                 <button
                   className="text-button"
+                  title={ready ? undefined : "Choose a writing model first"}
                   onClick={() => {
+                    if (!ready) return setup();
                     setRewrite(block);
                     setFeedback("");
                   }}
                 >
                   <Icon name="edit" />
-                  Rewrite
+                  {ready ? "Rewrite" : "Set up AI rewriting"}
                 </button>
                 <button
                   className="icon-button"

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
-import type { DesktopApi } from "@newsletter/core";
+import type { DesktopApi, Library } from "@newsletter/core";
 
 declare global {
   interface Window {
@@ -7,6 +7,16 @@ declare global {
   }
 }
 export const api = window.newsletter;
+
+/** True when a text provider is configured well enough to try a request.
+ *  This is a configuration check, not a live connection test. */
+export function writingReady(library: Library) {
+  const { settings, credentials } = library;
+  if (!settings.textModel) return false;
+  return (
+    settings.textProvider === "local" || credentials.includes("openrouter")
+  );
+}
 
 const paths = {
   library: "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z",

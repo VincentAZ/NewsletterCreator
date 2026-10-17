@@ -40,9 +40,21 @@ try {
   await expect(
     page.getByRole("button", { name: "Saved on this computer", exact: true }),
   ).toBeVisible();
+  // No writing model yet: the AI actions offer setup rather than a dead end.
+  await expect(
+    page.getByRole("button", { name: "Set up AI writing", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Draft with AI", exact: true }),
+  ).toHaveCount(0);
   const ids = await page.evaluate(async () => {
     const api = window.newsletter;
     const library = await api.invoke("library", {});
+    // AI actions stay in setup mode until a writing model is chosen.
+    await api.invoke("settings", {
+      ...library.settings,
+      textModel: "fixture-local-model",
+    });
     const profile = library.profiles[0];
     profile.sources = [
       {
