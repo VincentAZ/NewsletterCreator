@@ -48,7 +48,7 @@ function App() {
       <div className="loading">
         <span className="brand-mark">N</span>
         <h1>Opening your workspace</h1>
-        <p>{w.error || "Your newsletters stay on this computer."}</p>
+        <p>{w.error || "One moment…"}</p>
         {w.error && (
           <button onClick={() => void w.act(w.reload)}>
             Retry opening workspace
@@ -67,12 +67,11 @@ function App() {
         <div className="page-scroll">
           <div className="page-heading">
             <div>
-              <span className="eyebrow">YOUR PUBLICATION</span>
-              <h1>{w.profileId ? "Newsletter settings" : "Make it yours."}</h1>
-              <p>
-                A name is all you need to start. Add the rest whenever you’re
-                ready.
-              </p>
+              <span className="eyebrow">Newsletter</span>
+              <h1>
+                {w.profileId ? "Newsletter settings" : "Name your newsletter."}
+              </h1>
+              <p>A name is enough to start. Everything else is optional.</p>
             </div>
           </div>
           <ProfileEditor
@@ -127,11 +126,11 @@ function App() {
         <div className="page-scroll settings-page">
           <div className="page-heading">
             <div>
-              <span className="eyebrow">YOUR TOOLS</span>
-              <h1>Your tools. Your choice.</h1>
+              <span className="eyebrow">Settings</span>
+              <h1>AI &amp; integrations</h1>
               <p>
-                Write manually, connect local AI, or choose an optional cloud
-                provider.
+                Writing works without any of this. Connect local AI, a cloud
+                provider, or Mailchimp when you want them.
               </p>
             </div>
           </div>

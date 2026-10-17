@@ -26,6 +26,10 @@ export function useWorkspace() {
   const [progress, setProgress] = useState<Progress>();
   const [jobId, setJobId] = useState("");
   const [saveState, setSaveState] = useState("Saved on this computer");
+  // Set only when a save attempt was rejected. Cleared on the next successful
+  // save or when the unsaved draft is deliberately discarded.
+  const [saveFailure, setSaveFailure] = useState("");
+  const [deskProfileId, setDeskProfileId] = useState("");
   const [assets, setAssets] = useState<Record<string, string>>({});
   const [undo, setUndo] = useState<UndoEdit[]>([]);
   const [outcomes, setOutcomes] = useState<SourceOutcome[]>([]);
@@ -107,9 +111,13 @@ export function useWorkspace() {
               : current,
           );
           setSaveState("Saved on this computer");
+          setSaveFailure("");
         } catch (error) {
           dirty.current = true;
           setSaveState("Not saved · retry before leaving");
+          setSaveFailure(
+            error instanceof Error ? error.message : "The save was rejected.",
+          );
           throw error;
         }
       }
@@ -323,6 +331,63 @@ export function useWorkspace() {
     setUndo([]);
     setOutcomes([]);
     dirty.current = false;
+    setSaveFailure("");
+    setSaveState("Saved on this computer");
+  }
+  /** Plain-text copy of the unsaved draft, for the clipboard when a save keeps failing. */
+  function draftAsText() {
+    const current = latest.current;
+    if (!current) return "";
+    return [
+      current.title,
+      current.subject && `Subject: ${current.subject}`,
+      current.preheader && `Preview: ${current.preheader}`,
+      "",
+      current.intro,
+      ...current.blocks.flatMap((block) => [
+        "",
+        block.title && `## ${block.title}`,
+        block.body,
+        block.url && block.url,
+      ]),
+    ]
+      .filter((line): line is string => typeof line === "string")
+      .join("\n")
+      .trim();
+  }
+  async function copyDraft() {
+    const text = draftAsText();
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setStatus("Draft copied to the clipboard.");
+  }
+  /** Give up the unsaved edits and reopen the saved version of the same issue. */
+  async function discardAndReload() {
+    const id = latest.current?.id;
+    clearTimeout(timer.current);
+    dirty.current = false;
+    const data = await reload();
+    const saved = id ? data.issues.find((item) => item.id === id) : undefined;
+    setSaveFailure("");
+    setUndo([]);
+    if (saved) {
+      latest.current = saved;
+      revision.current.set(saved.id, saved.revision);
+      setIssue(saved);
+      setSaveState("Saved on this computer");
+    } else {
+      latest.current = undefined;
+      setIssue(undefined);
+      setSaveState("Saved on this computer");
+      setPage("library");
+    }
+  }
+  /** Scope the writing desk to one newsletter (or "" for everything). */
+  async function showDesk(id = "") {
+    await flush();
+    setDeskProfileId(id);
+    if (id) setProfileId(id);
+    setPage("library");
   }
   async function selectNewsletter(id: string) {
     await flush();
@@ -367,6 +432,8 @@ export function useWorkspace() {
     progress,
     jobId,
     saveState,
+    saveFailure,
+    deskProfileId,
     assets,
     undo,
     outcomes,
@@ -391,6 +458,9 @@ export function useWorkspace() {
     updateBlock,
     clearIssue,
     selectNewsletter,
+    showDesk,
+    copyDraft,
+    discardAndReload,
     exportHtml,
     mailchimp,
     undoLast,

@@ -55,7 +55,7 @@ export function IssueEditor({
     <div className="issue-editor" aria-label="Issue editor">
       <div className="editor-heading">
         <div>
-          <span className="eyebrow">YOUR NEXT EDITION</span>
+          <span className="eyebrow">Edition</span>
           <h1>{issue.title}</h1>
         </div>
         <button
@@ -73,42 +73,65 @@ export function IssueEditor({
           : "Write in your own words, or add a source to begin."}
       </p>
       <fieldset disabled={w.busy} className="editor-fields">
-        <details
-          className="email-details panel"
-          open={emailDetailsOpen}
-          onToggle={(event) => setEmailDetailsOpen(event.currentTarget.open)}
+        <section
+          className="paper-editor"
+          aria-label="Email details and introduction"
         >
-          <summary>Email details</summary>
-          <Field
-            label="Issue name"
-            value={issue.title}
-            onChange={(title) => w.change({ ...issue, title })}
-          />
-          <Field
-            label="Email subject"
-            value={issue.subject}
-            onChange={(subject) => w.change({ ...issue, subject })}
-            placeholder="A reason to open this email"
-          />
-          <Field
-            label="Preview text"
-            value={issue.preheader}
-            onChange={(preheader) => w.change({ ...issue, preheader })}
-            placeholder="The little line that follows your subject"
-          />
-        </details>
-        <section className="intro-block">
-          <Field
-            label="Your introduction"
-            value={issue.intro}
-            onChange={(intro) => w.change({ ...issue, intro })}
-            multiline
-            placeholder="A note to your readers…"
-          />
+          <details
+            className="email-details"
+            open={emailDetailsOpen}
+            onToggle={(event) => setEmailDetailsOpen(event.currentTarget.open)}
+          >
+            <summary>
+              {issue.subject
+                ? `Email details · ${issue.subject}`
+                : "Email details · add a subject line"}
+            </summary>
+            <div className="paper-topline">
+              <span className="eyebrow">The inbox first impression</span>
+              <span className="subtle">Only your readers see these</span>
+            </div>
+            <Field
+              label="Issue name"
+              value={issue.title}
+              onChange={(title) => w.change({ ...issue, title })}
+            />
+            <div className="subject-field">
+              <Field
+                label="Email subject"
+                value={issue.subject}
+                onChange={(subject) => w.change({ ...issue, subject })}
+                placeholder="A reason to open this email"
+              />
+            </div>
+            <Field
+              label="Preview text"
+              value={issue.preheader}
+              onChange={(preheader) => w.change({ ...issue, preheader })}
+              placeholder="The line that follows your subject in the inbox"
+            />
+          </details>
+          <div className="editor-divider" />
+          <div className="paper-topline">
+            <span className="eyebrow">A note from you</span>
+            <span className="subtle">Introduction</span>
+          </div>
+          <div className="intro-block">
+            <Field
+              label="Your introduction"
+              value={issue.intro}
+              onChange={(intro) => w.change({ ...issue, intro })}
+              multiline
+              placeholder="Hello, everyone…"
+            />
+          </div>
         </section>
         <div className="section-heading">
-          <h2>In this issue</h2>
-          <span>{issue.blocks.length} blocks</span>
+          <h2>
+            In this edition
+            <span className="count-badge">{issue.blocks.length}</span>
+          </h2>
+          <span>Your stories, in your order.</span>
         </div>
         {issue.blocks.map((block, index) => (
           <article

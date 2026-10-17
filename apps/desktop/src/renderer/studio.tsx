@@ -16,7 +16,7 @@ export function Studio({ workspace: w }: { workspace: Workspace }) {
   const [activeBlock, setActiveBlock] = useState("");
   const narrow = width < 1100;
   const panelLimit =
-    width < 1600 ? Math.max(280, Math.min(400, width - 176 - 560 - 6)) : 400;
+    width < 1600 ? Math.max(280, Math.min(400, width - 224 - 560 - 6)) : 400;
   const shownSourceWidth = Math.min(sourceWidth, panelLimit);
   const shownPreviewWidth = Math.min(previewWidth, panelLimit);
   useEffect(() => {
@@ -64,7 +64,7 @@ export function Studio({ workspace: w }: { workspace: Workspace }) {
         : sources
           ? sourceWidth + 6
           : 0;
-    const max = Math.min(400, width - 176 - 560 - other - 6);
+    const max = Math.min(400, width - 224 - 560 - other - 6);
     const next = Math.max(280, Math.min(max, value));
     if (side === "left") setSourceWidth(next);
     else setPreviewWidth(next);

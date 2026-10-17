@@ -554,7 +554,7 @@ try {
   await page
     .getByLabel("Your introduction", { exact: true })
     .fill("My unsaved competing revision");
-  await page.getByRole("button", { name: "Library", exact: true }).click();
+  await page.getByRole("button", { name: "Writing desk", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(page.locator(".studio-mount")).toBeVisible();
   await expect(
@@ -569,9 +569,43 @@ try {
   );
   expect(saved.intro).toBe("A newer saved revision");
   expect(saved.blocks.some((block) => block.assetId)).toBe(true);
+
+  // A persistent rejection must leave a way out that never overwrites the
+  // newer revision: retry, copy the draft, or discard it and reload.
+  const recovery = page.locator(".save-recovery");
+  await expect(recovery).toBeVisible();
+  await expect(recovery).toContainText("changed in another window");
+  await recovery
+    .getByRole("button", { name: "Retry save", exact: true })
+    .click();
+  await expect(recovery).toBeVisible();
+  await expect(
+    page.getByLabel("Your introduction", { exact: true }),
+  ).toHaveValue("My unsaved competing revision");
+  page.once("dialog", (dialog) => void dialog.accept());
+  await recovery
+    .getByRole("button", { name: "Discard edits and reload", exact: true })
+    .click();
+  await expect(recovery).toHaveCount(0);
+  await expect(
+    page.getByLabel("Your introduction", { exact: true }),
+  ).toHaveValue("A newer saved revision");
+  await expect(
+    page.getByRole("button", { name: "Saved on this computer", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Writing desk", exact: true }).click();
+  await expect(page.locator(".library-view")).toBeVisible();
+  const afterDiscard = await page.evaluate(
+    async (id) =>
+      (await window.newsletter.invoke("library", {})).issues.find(
+        (issue) => issue.id === id,
+      ),
+    ids.issue,
+  );
+  expect(afterDiscard.intro).toBe("A newer saved revision");
   expect(errors).toEqual([]);
   console.log(
-    "Studio passed: source filters/insertion, scoped undo, modal focus, rewrite failure/retry, real image persistence/export, responsive panes, zoom and stale-save navigation protection.",
+    "Studio passed: source filters/insertion, scoped undo, modal focus, rewrite failure/retry, real image persistence/export, responsive panes, zoom, stale-save navigation protection and save-failure recovery.",
     JSON.stringify(metrics),
   );
 } finally {

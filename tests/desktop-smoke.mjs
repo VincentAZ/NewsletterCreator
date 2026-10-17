@@ -149,10 +149,12 @@ try {
   expect(chromiumRequests).toEqual([]);
   app = await launch();
   const reopened = await app.firstWindow();
-  await expect(
-    reopened.getByText("Neighborhood edition", { exact: true }),
-  ).toBeVisible();
-  await reopened.getByText("Neighborhood edition", { exact: true }).click();
+  // The desk shows the edition in the resume hero and in the edition grid.
+  const reopenedTitle = reopened
+    .locator(".issue-title")
+    .filter({ hasText: "Neighborhood edition" });
+  await expect(reopenedTitle).toBeVisible();
+  await reopenedTitle.click();
   await expect(reopened.getByLabel("Heading", { exact: true })).toHaveValue(
     "The community garden is growing",
   );
