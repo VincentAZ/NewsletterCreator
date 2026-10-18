@@ -1,6 +1,6 @@
 # NewsletterCreator
 
-**A desktop app for writing email newsletters, on your own computer.** Keep a few newsletters, write each edition as blocks, pull in source stories when you want them, preview the email, and export self-contained HTML or hand a draft to Mailchimp.
+**A desktop app for writing email newsletters, with an AI writer that runs on your own computer.** Keep a few newsletters, write each edition as blocks, pull in stories from your sources and have the local AI draft or tighten them when you want, preview the email, and export self-contained HTML or hand a draft to Mailchimp.
 
 Free and open source under the [MIT License](LICENSE). **No account. No sign-in. No analytics.** Everything you write stays on your computer unless you connect a service and use it.
 
