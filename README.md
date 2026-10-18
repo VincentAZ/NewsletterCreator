@@ -4,7 +4,9 @@
 
 Free and open source under the [MIT License](LICENSE). **No account. No sign-in. No analytics. Nothing leaves your machine** unless you opt in by connecting a service and using it.
 
-![The writing desk: a resume card for the edition you touched last, editions as cover cards, and every newsletter in the left rail](docs/screenshots/writing-desk.png)
+![A finished issue in Preview & Export: the email with its story, picture and links, ready for Export HTML or Create Mailchimp draft](docs/screenshots/ready-to-send.png)
+
+_An issue made with Newsletter Creator, images included, one click from Mailchimp._
 
 ## Download
 
