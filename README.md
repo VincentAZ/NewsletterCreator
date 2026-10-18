@@ -2,7 +2,7 @@
 
 **Point it at your sources and get a newsletter back.** It gathers the stories, AI running on your own computer sorts them, drafts the edition and makes the pictures, and you get an issue that's ready to send. Keep a few newsletters, write or fix each edition as blocks, preview the email, and export self-contained HTML or hand a draft to Mailchimp.
 
-Free and open source under the [MIT License](LICENSE). **No account. No sign-in. No analytics.** Everything you write stays on your computer unless you connect a service and use it.
+Free and open source under the [MIT License](LICENSE). **No account. No sign-in. No analytics. Nothing leaves your machine** unless you opt in by connecting a service and using it.
 
 ![The writing desk: a resume card for the edition you touched last, editions as cover cards, and every newsletter in the left rail](docs/screenshots/writing-desk.png)
 
